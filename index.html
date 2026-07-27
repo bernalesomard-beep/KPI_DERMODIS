@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Indicadores de Ingresos - Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "on-surface-variant": "#424750", "outline-variant": "#c3c6d1", "secondary-container": "#74f9a0",
+          "on-tertiary-container": "#4c3f00", "on-tertiary": "#ffffff", "on-secondary-container": "#00723a",
+          "on-error-container": "#93000a", "secondary": "#006d38", "surface-container-high": "#dce9ff",
+          "tertiary": "#705d00", "surface": "#f8f9ff", "on-secondary": "#ffffff", "surface-variant": "#d3e4fe",
+          "primary-container": "#1b4d89", "on-primary-container": "#98bfff", "on-error": "#ffffff",
+          "tertiary-fixed-dim": "#e9c400", "surface-container": "#e5eeff", "error": "#ba1a1a",
+          "surface-bright": "#f8f9ff", "outline": "#737781", "surface-container-lowest": "#ffffff",
+          "tertiary-container": "#c9a900", "background": "#f8f9ff", "primary": "#00366b",
+          "surface-container-highest": "#d3e4fe", "on-background": "#0b1c30", "error-container": "#ffdad6",
+          "surface-container-low": "#eff4ff", "on-primary": "#ffffff", "on-surface": "#0b1c30"
+        },
+        borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+        spacing: { "table-cell-padding": "0.75rem 1rem", "card-padding": "1.5rem" },
+        fontFamily: {
+          "headline-md": ["Hanken Grotesk"], "data-mono": ["JetBrains Mono"],
+          "table-header": ["Inter"], "body-sm": ["Inter"], "body-md": ["Inter"]
+        },
+        fontSize: {
+          "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+          "data-mono": ["13px", { lineHeight: "16px", fontWeight: "500" }],
+          "table-header": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+          "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+          "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }]
+        }
+      }
+    }
+  }
+</script>
+<style>
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .zebra-stripe:nth-child(even) { background-color: rgba(229, 238, 255, 0.3); }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .glass-card { background: rgba(255,255,255,0.8); backdrop-filter: blur(8px); border: 1px solid rgba(226,232,240,0.5); }
+  .view { display: none; }
+  .view.active { display: block; }
+  .nav-link.active { background: theme('colors.primary-container'); color: theme('colors.on-primary-container'); }
+  .field-group.hidden-group { display: none; }
+  .modal-overlay { display: none; }
+  .modal-overlay.active { display: flex; }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-surface flex h-screen overflow-hidden">
+
+<!-- Sidebar -->
+<aside class="hidden md:flex flex-col h-full w-80 bg-surface border-r border-outline-variant shadow-2xl z-40">
+  <div class="flex flex-col px-6 py-8">
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 rounded-full overflow-hidden bg-primary-container flex items-center justify-center">
+        <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_2m961eFCdxrB0Iv2i6TfuH1gw6B7-saCEAAyRZSVc0_HPhNudt8dHNTB-YcDLOJAWyyVyPeI763D9Xiw7BcFntoBJ26kd5aHb4SMl_FGFD40by6rCclevk2ZEcQ-UgBbjirgPV_3YD3W1TBNmOLn-D-5xcaQyS-km8TMj9UJ2PEEbS8e41_rl4Ay9XR__ktqtv6HMc7pf2eD_XeG1w5cS2smdyHveaH9n5vVJXhYIC0HLOBkOl6I58Q5DDh6J6tYfQ" alt="Logo">
+      </div>
+      <div class="flex flex-col">
+        <span class="text-body-sm text-on-surface-variant">Omar Bernales</span>
+      </div>
+    </div>
+  </div>
+  <nav class="flex-1 space-y-2 px-2 overflow-y-auto">
+    <a data-view="dashboard" class="nav-link active text-on-surface-variant rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">dashboard</span><span>Dashboard</span>
+    </a>
+    <a data-view="historial" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">history</span><span>Historial y Filtros</span>
+    </a>
+  </nav>
+  <div class="p-6 border-t border-outline-variant">
+    <span class="text-body-sm text-outline">Omar v2.0 · Conectado a Sheets</span>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+  <header class="h-16 flex items-center justify-between px-4 lg:px-8 bg-surface shadow-sm z-50">
+    <h1 id="page-title" class="font-headline-md text-headline-md text-primary font-extrabold tracking-tight">Dashboard</h1>
+    <div class="flex items-center gap-4">
+      <div id="status-pill" class="text-body-sm text-outline flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-outline"></span><span>Sin conectar</span>
+      </div>
+      <div class="h-8 w-[1px] bg-outline-variant mx-1 hidden lg:block"></div>
+      <div class="hidden lg:flex items-center gap-2">
+        <span id="current-period-label" class="text-body-sm font-semibold"></span>
+        <span class="material-symbols-outlined text-outline">calendar_today</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 scrollbar-hide">
+
+    <!-- ===================== VIEW: DASHBOARD ===================== -->
+    <section id="view-dashboard" class="view active space-y-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-4 glass-card rounded-xl p-card-padding shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-table-header text-primary uppercase font-bold tracking-widest">Resumen Ingresos</span>
+            <span class="material-symbols-outlined text-secondary">trending_up</span>
+          </div>
+          <div id="card-ingresos" class="space-y-4">Cargando…</div>
+        </div>
+        <div class="lg:col-span-4 glass-card rounded-xl p-card-padding shadow-sm flex flex-col gap-4">
+          <div class="flex items-center justify-between">
+            <span class="text-table-header text-primary uppercase font-bold tracking-widest">Total Anual <span id="card-total-year"></span></span>
+            <span class="material-symbols-outlined text-primary">analytics</span>
+          </div>
+          <div id="card-total" class="grid grid-cols-2 gap-4">Cargando…</div>
+          <div class="mt-2 pt-2 border-t border-outline-variant">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[11px] text-on-surface-variant">Eficiencia Operativa</span>
+              <span id="eficiencia-pct" class="text-[11px] font-bold text-secondary">0%</span>
+            </div>
+            <div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+              <div id="eficiencia-bar" class="bg-secondary h-full" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="lg:col-span-4 glass-card rounded-xl p-card-padding shadow-sm hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-table-header text-error uppercase font-bold tracking-widest">Devoluciones</span>
+            <span class="material-symbols-outlined text-error">assignment_return</span>
+          </div>
+          <div id="card-devoluciones" class="space-y-4">Cargando…</div>
+        </div>
+      </div>
+
+      <!-- Detalle de Registros Operativos -->
+      <section class="glass-card rounded-xl overflow-hidden shadow-sm">
+        <div class="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary">list_alt</span>
+            <h3 class="font-headline-md text-body-md font-bold text-primary">Detalle de Registros Operativos</h3>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="btn-descargar-plantilla" class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">description</span> Descargar Plantilla
+            </button>
+            <label class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2 cursor-pointer">
+              <span class="material-symbols-outlined text-body-sm">file_upload</span> Subir Plantilla
+              <input type="file" id="input-plantilla" accept=".xlsx,.xls,.csv" class="hidden">
+            </label>
+            <button id="btn-nuevo-registro" class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">add_circle</span> Nuevo Registro
+            </button>
+            <button id="btn-exportar-dash" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">download</span> Exportar
+            </button>
+          </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-container-lowest border-b border-outline-variant flex flex-wrap items-end gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Rango de Fechas</label>
+            <div class="flex items-center gap-2">
+              <input type="date" id="d-desde" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+              <span class="text-outline">-</span>
+              <input type="date" id="d-hasta" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Mes</label>
+            <select id="d-mes" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm min-w-[140px]"><option value="">Todos los meses</option></select>
+          </div>
+          <button id="btn-filtrar-dash" class="px-4 py-1.5 bg-surface-container-high text-primary rounded-lg text-body-sm font-bold hover:bg-surface-container-highest transition-colors">Aplicar Filtros</button>
+          <span id="bulk-msg" class="text-body-sm ml-auto"></span>
+        </div>
+        <div class="overflow-x-auto max-h-[500px]" id="dashboard-table-wrap">Cargando datos…</div>
+        <div class="p-4 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-between">
+          <span id="dashboard-count" class="text-body-sm text-on-surface-variant">Mostrando 0 de 0 registros</span>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===================== VIEW: HISTORIAL / FILTROS ===================== -->
+    <section id="view-historial" class="view">
+      <section class="glass-card rounded-xl overflow-hidden shadow-sm">
+        <div class="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low flex-wrap gap-4">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary">list_alt</span>
+            <h3 class="font-headline-md text-body-md font-bold text-primary">Historial de Registros</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-filtrar" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">filter_list</span> Aplicar Filtros
+            </button>
+            <button id="btn-exportar" class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">download</span> Exportar CSV
+            </button>
+          </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-container-lowest border-b border-outline-variant flex flex-wrap items-end gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Rango de Fechas</label>
+            <div class="flex items-center gap-2">
+              <input type="date" id="h-desde" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+              <span class="text-outline">-</span>
+              <input type="date" id="h-hasta" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+            </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Mes</label>
+            <select id="h-mes" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm min-w-[140px]"><option value="">Todos</option></select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Tipo</label>
+            <select id="h-tipo" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm min-w-[180px]"><option value="">Todos</option></select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Negocio</label>
+            <input id="h-negocio" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm" placeholder="Ej. RECAMIER">
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Buscar</label>
+            <input id="h-q" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm" placeholder="Doc / Guía / Contenedor">
+          </div>
+        </div>
+        <div class="overflow-x-auto max-h-[560px]" id="historial-table-wrap">Ajusta los filtros y presiona "Aplicar Filtros".</div>
+        <div class="p-4 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-between">
+          <span id="historial-count" class="text-body-sm text-on-surface-variant">0 registros</span>
+        </div>
+      </section>
+    </section>
+
+  </div>
+</main>
+
+<!-- ===================== MODAL: NUEVO / EDITAR REGISTRO ===================== -->
+<div id="modal-registro" class="modal-overlay fixed inset-0 bg-black/40 items-center justify-center z-[100] p-4">
+  <div class="glass-card bg-surface rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low sticky top-0 z-10">
+      <h3 id="modal-registro-title" class="font-headline-md text-body-md font-bold text-primary">Nuevo registro</h3>
+      <button id="btn-cerrar-modal-registro" class="material-symbols-outlined text-on-surface-variant hover:text-error">close</button>
+    </div>
+    <form id="form-registro" class="p-6 space-y-6">
+      <div>
+        <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Tipo de Recepción *</label>
+        <select id="m-tipo" required class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></select>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Mes *</label>
+          <select id="m-mes" required class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></select></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Negocio *</label>
+          <input id="m-negocio" required list="negocios-list" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm" placeholder="Ej. RECAMIER">
+          <datalist id="negocios-list"></datalist></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Documento de Ingreso *</label>
+          <input id="m-documento" required class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Número de Contenedor</label>
+          <input id="m-contenedor" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Número de Referencia</label>
+          <input id="m-referencia" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Número de Guía</label>
+          <input id="m-guia" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Fecha de Recepción *</label>
+          <input type="date" id="m-fecha-recep" required class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Fecha de Emisión de la NI</label>
+          <input type="date" id="m-fecha-ni" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Responsable</label>
+          <input id="m-responsable" list="responsables-list" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm">
+          <datalist id="responsables-list"></datalist></div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Tipo Producto</label>
+          <input id="m-tipoproducto" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm" placeholder="PT"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Unidades</label>
+          <input type="number" id="m-unidades" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Bultos</label>
+          <input type="number" id="m-bultos" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Paletas</label>
+          <input type="number" id="m-paletas" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Área Responsable</label>
+          <input id="m-area" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Peso Neto</label>
+          <input type="number" id="m-peso" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+        <div><label class="text-[10px] font-bold text-primary uppercase tracking-wider">Volumen Neto</label>
+          <input type="number" id="m-volumen" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+      </div>
+
+      <!-- Campos exclusivos de Devolución -->
+      <div id="m-grupo-devolucion" class="field-group hidden-group border-t border-outline-variant pt-6 space-y-4">
+        <h4 class="text-table-header text-error uppercase font-bold tracking-widest">Datos de Devolución</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div><label class="text-[10px] font-bold text-error uppercase tracking-wider">Proveedor</label>
+            <input id="m-proveedor" list="proveedores-list" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm">
+            <datalist id="proveedores-list"></datalist></div>
+          <div><label class="text-[10px] font-bold text-error uppercase tracking-wider">Facturable Devoluciones</label>
+            <select id="m-facturable" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm">
+              <option value="">-</option><option value="SI">SI</option><option value="NO">NO</option>
+            </select></div>
+          <div><label class="text-[10px] font-bold text-error uppercase tracking-wider">Motivo de Devolución</label>
+            <input id="m-motivo-dev" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm" placeholder="Ej. PRODUCTOS NO SOLICITADOS"></div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div><label class="text-[10px] font-bold text-error uppercase tracking-wider">Hora Inicio</label>
+            <input type="time" id="m-hora-inicio" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+          <div><label class="text-[10px] font-bold text-error uppercase tracking-wider">Hora Final</label>
+            <input type="time" id="m-hora-final" class="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-sm"></div>
+          <div class="flex items-end gap-4 pb-1">
+            <label class="flex items-center gap-2 text-body-sm"><input type="checkbox" id="m-conclient"> CONCLIENT</label>
+            <label class="flex items-center gap-2 text-body-sm"><input type="checkbox" id="m-conglobal"> CONGLOBAL</label>
+            <label class="flex items-center gap-2 text-body-sm"><input type="checkbox" id="m-consignia"> CONSIGNIA</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 pt-2 pb-2">
+        <button type="submit" class="px-6 py-2.5 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+          <span class="material-symbols-outlined text-body-sm">save</span> <span id="modal-registro-save-label">Guardar registro</span>
+        </button>
+        <button type="button" id="btn-cancelar-modal-registro" class="px-6 py-2.5 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high">Cancelar</button>
+        <span id="form-msg" class="text-body-sm"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CARGA MASIVA (VISTA PREVIA) ===================== -->
+<div id="modal-bulk" class="modal-overlay fixed inset-0 bg-black/40 items-center justify-center z-[100] p-4">
+  <div class="glass-card bg-surface rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+    <div class="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low sticky top-0 z-10">
+      <h3 class="font-headline-md text-body-md font-bold text-primary">Carga masiva — Vista previa</h3>
+      <button id="btn-cerrar-modal-bulk" class="material-symbols-outlined text-on-surface-variant hover:text-error">close</button>
+    </div>
+    <div class="p-6">
+      <p class="text-body-sm text-outline mb-4">Revisa los registros detectados en el archivo antes de guardarlos en el Sheet.</p>
+      <div id="bulk-preview-wrap" class="overflow-x-auto max-h-[400px] border border-outline-variant rounded-lg"></div>
+      <div id="bulk-confirm-wrap" class="mt-4">
+        <button id="btn-confirmar-carga" class="px-6 py-2.5 bg-secondary text-on-secondary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+          <span class="material-symbols-outlined text-body-sm">cloud_upload</span> Confirmar y Registrar <span id="bulk-count"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================================================================
+// CONFIGURACIÓN: pega aquí la URL de tu Web App de Apps Script
+// (Implementar > Nueva implementación > Aplicación web > Copiar URL)
+// ======================================================================
+const CONFIG = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbz-1zta_TtpuncmRUP2jmM1GN42P5-KLNf_4YZQ7xP-tL7mZjKoNCQKWN-me39MWaRbTg/exec'
+};
+
+const HEADERS_ORDER = [
+  'Mes','Negocio','Documento de Ingreso','Numero de Contenedor','Numero de referencia','Numero guia',
+  'Tipo de Recepcion','Fecha de recepcion','Fecha de Emision de la NI','Lead Time',
+  'Cumplimiento de Ingreso (NI)','Indicador Acido','Status de cumplimiento','Responsable',
+  'Motivo de incumplimiento','Cantidad de Recepciones','Tipo producto','Suma de Unidades',
+  'Cantidad de Bultos','Cantidad de Paletas','Suma de Peso Neto','Suma de Volumen Neto',
+  'Area responsable','CONCLIENT','CONGLOBAL','CONSIGNIA','HORA INICIO','HORA FINAL',
+  'LEAD TIME ATENCION','PROVEEDOR','FACTURABLE DEVOLUCIONES','MOTIVO - DEVOLUCION'
+];
+
+const MESES_ORDEN = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+let META = { tipos: [], negocios: [], responsables: [], proveedores: [], meses: [] };
+let currentData = [];      // dataset usado por Historial (y export CSV de Historial)
+let dashboardData = [];    // dataset completo cargado para el Dashboard
+let dashboardFiltered = []; // subconjunto tras aplicar filtros del Dashboard
+let editingKey = null;     // claves del registro que se está editando (null = registro nuevo)
+
+// ---------- Navegación ----------
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', () => {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    const view = link.dataset.view;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + view).classList.add('active');
+    document.getElementById('page-title').textContent =
+      view === 'dashboard' ? 'Dashboard' : 'Historial y Filtros';
+  });
+});
+
+// Etiqueta de periodo actual en el header (mes/año en curso)
+(function setPeriodLabel() {
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const now = new Date();
+  document.getElementById('current-period-label').textContent = `${meses[now.getMonth()]} ${now.getFullYear()}`;
+})();
+
+// ---------- Helpers de conexión ----------
+function setStatus(ok, text) {
+  const pill = document.getElementById('status-pill');
+  pill.innerHTML = `<span class="w-2 h-2 rounded-full ${ok ? 'bg-secondary' : 'bg-error'}"></span><span>${text}</span>`;
+}
+
+async function apiGet(params) {
+  const url = new URL(CONFIG.API_URL);
+  Object.entries(params || {}).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
+  const res = await fetch(url.toString());
+  return res.json();
+}
+
+async function apiPost(payload) {
+  const res = await fetch(CONFIG.API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS con Apps Script
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+function val(id) { return document.getElementById(id).value; }
+function isDevolucionRow(r) { return String(r['Tipo de Recepcion']).toUpperCase().indexOf('DEVOLUCION') !== -1; }
+function sum(arr, key) { return arr.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
+
+// ---------- Carga inicial de metadatos (selects) ----------
+async function loadMeta() {
+  const meta = await apiGet({ action: 'meta' });
+  META = meta;
+  const tipoSel = document.getElementById('m-tipo');
+  tipoSel.innerHTML = meta.tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  const mesSel = document.getElementById('m-mes');
+  mesSel.innerHTML = meta.meses.map(m => `<option value="${m}">${m}</option>`).join('');
+
+  document.getElementById('negocios-list').innerHTML = meta.negocios.map(n => `<option value="${n}">`).join('');
+  document.getElementById('responsables-list').innerHTML = meta.responsables.map(n => `<option value="${n}">`).join('');
+  document.getElementById('proveedores-list').innerHTML = meta.proveedores.map(n => `<option value="${n}">`).join('');
+
+  const hMes = document.getElementById('h-mes');
+  hMes.innerHTML = '<option value="">Todos</option>' + meta.meses.map(m => `<option value="${m}">${m}</option>`).join('');
+  const hTipo = document.getElementById('h-tipo');
+  hTipo.innerHTML = '<option value="">Todos</option>' + meta.tipos.map(t => `<option value="${t}">${t}</option>`).join('');
+  const dMes = document.getElementById('d-mes');
+  dMes.innerHTML = '<option value="">Todos los meses</option>' + meta.meses.map(m => `<option value="${m}">${m}</option>`).join('');
+
+  toggleDevolucionFields();
+}
+
+// ---------- Mostrar/ocultar campos de devolución según Tipo ----------
+document.getElementById('m-tipo').addEventListener('change', toggleDevolucionFields);
+function toggleDevolucionFields() {
+  const tipo = document.getElementById('m-tipo').value || '';
+  const isDevolucion = tipo.toUpperCase().indexOf('DEVOLUCION') !== -1;
+  document.getElementById('m-grupo-devolucion').classList.toggle('hidden-group', !isDevolucion);
+}
+
+// ======================================================================
+// MODAL: Nuevo registro / Editar registro
+// ======================================================================
+function openModalRegistro(mode, row) {
+  document.getElementById('form-registro').reset();
+  document.getElementById('form-msg').textContent = '';
+  if (mode === 'edit' && row) {
+    document.getElementById('modal-registro-title').textContent = 'Editar registro';
+    document.getElementById('modal-registro-save-label').textContent = 'Guardar cambios';
+    editingKey = {
+      'Documento de Ingreso': row['Documento de Ingreso'] || '',
+      'Mes': row['Mes'] || '',
+      'Numero guia': row['Numero guia'] || ''
+    };
+    document.getElementById('m-tipo').value = row['Tipo de Recepcion'] || '';
+    document.getElementById('m-mes').value = row['Mes'] || '';
+    document.getElementById('m-negocio').value = row['Negocio'] || '';
+    document.getElementById('m-documento').value = row['Documento de Ingreso'] || '';
+    document.getElementById('m-contenedor').value = row['Numero de Contenedor'] || '';
+    document.getElementById('m-referencia').value = row['Numero de referencia'] || '';
+    document.getElementById('m-guia').value = row['Numero guia'] || '';
+    document.getElementById('m-fecha-recep').value = row['Fecha de recepcion'] || '';
+    document.getElementById('m-fecha-ni').value = row['Fecha de Emision de la NI'] || '';
+    document.getElementById('m-responsable').value = row['Responsable'] || '';
+    document.getElementById('m-tipoproducto').value = row['Tipo producto'] || '';
+    document.getElementById('m-unidades').value = row['Suma de Unidades'] || '';
+    document.getElementById('m-bultos').value = row['Cantidad de Bultos'] || '';
+    document.getElementById('m-paletas').value = row['Cantidad de Paletas'] || '';
+    document.getElementById('m-area').value = row['Area responsable'] || '';
+    document.getElementById('m-peso').value = row['Suma de Peso Neto'] || '';
+    document.getElementById('m-volumen').value = row['Suma de Volumen Neto'] || '';
+    document.getElementById('m-proveedor').value = row['PROVEEDOR'] || '';
+    document.getElementById('m-facturable').value = row['FACTURABLE DEVOLUCIONES'] || '';
+    document.getElementById('m-motivo-dev').value = row['MOTIVO - DEVOLUCION'] || '';
+    document.getElementById('m-hora-inicio').value = row['HORA INICIO'] || '';
+    document.getElementById('m-hora-final').value = row['HORA FINAL'] || '';
+    document.getElementById('m-conclient').checked = String(row['CONCLIENT']) === '1';
+    document.getElementById('m-conglobal').checked = String(row['CONGLOBAL']) === '1';
+    document.getElementById('m-consignia').checked = String(row['CONSIGNIA']) === '1';
+  } else {
+    document.getElementById('modal-registro-title').textContent = 'Nuevo registro';
+    document.getElementById('modal-registro-save-label').textContent = 'Guardar registro';
+    editingKey = null;
+  }
+  toggleDevolucionFields();
+  document.getElementById('modal-registro').classList.add('active');
+}
+function closeModalRegistro() {
+  document.getElementById('modal-registro').classList.remove('active');
+  editingKey = null;
+}
+document.getElementById('btn-nuevo-registro').addEventListener('click', () => openModalRegistro('new'));
+document.getElementById('btn-cerrar-modal-registro').addEventListener('click', closeModalRegistro);
+document.getElementById('btn-cancelar-modal-registro').addEventListener('click', closeModalRegistro);
+
+// ---------- Envío del formulario (crear o actualizar) ----------
+document.getElementById('form-registro').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('form-msg');
+  msg.textContent = 'Guardando...';
+  msg.className = 'text-body-sm text-outline';
+
+  const payload = {
+    'Mes': val('m-mes'), 'Negocio': val('m-negocio'), 'Documento de Ingreso': val('m-documento'),
+    'Numero de Contenedor': val('m-contenedor'), 'Numero de referencia': val('m-referencia'),
+    'Numero guia': val('m-guia'), 'Tipo de Recepcion': val('m-tipo'),
+    'Fecha de recepcion': val('m-fecha-recep'), 'Fecha de Emision de la NI': val('m-fecha-ni'),
+    'Responsable': val('m-responsable'), 'Tipo producto': val('m-tipoproducto'),
+    'Suma de Unidades': val('m-unidades'), 'Cantidad de Bultos': val('m-bultos'),
+    'Cantidad de Paletas': val('m-paletas'), 'Area responsable': val('m-area'),
+    'Suma de Peso Neto': val('m-peso'), 'Suma de Volumen Neto': val('m-volumen'),
+    'Cantidad de Recepciones': 1,
+    'PROVEEDOR': val('m-proveedor'), 'FACTURABLE DEVOLUCIONES': val('m-facturable'),
+    'MOTIVO - DEVOLUCION': val('m-motivo-dev'),
+    'HORA INICIO': val('m-hora-inicio'), 'HORA FINAL': val('m-hora-final'),
+    'CONCLIENT': document.getElementById('m-conclient').checked ? 1 : 0,
+    'CONGLOBAL': document.getElementById('m-conglobal').checked ? 1 : 0,
+    'CONSIGNIA': document.getElementById('m-consignia').checked ? 1 : 0
+  };
+
+  if (editingKey) {
+    payload._action = 'update';
+    payload._matchKeys = editingKey; // el backend debe ubicar la fila por estas claves
+  } else {
+    payload._action = 'create';
+  }
+
+  try {
+    const result = await apiPost(payload);
+    if (result.ok) {
+      msg.textContent = editingKey ? '✔ Registro actualizado.' : '✔ Registro guardado.';
+      msg.className = 'text-body-sm text-secondary font-semibold';
+      setTimeout(() => {
+        closeModalRegistro();
+        loadDashboard();
+      }, 500);
+    } else {
+      throw new Error(result.error || 'Error desconocido');
+    }
+  } catch (err) {
+    msg.textContent = '✖ Error al guardar: ' + err.message;
+    msg.className = 'text-body-sm text-error font-semibold';
+  }
+});
+
+// ======================================================================
+// CARGA MASIVA DESDE EXCEL
+// ======================================================================
+let bulkRecords = [];
+
+function openModalBulk() { document.getElementById('modal-bulk').classList.add('active'); }
+function closeModalBulk() { document.getElementById('modal-bulk').classList.remove('active'); }
+document.getElementById('btn-cerrar-modal-bulk').addEventListener('click', closeModalBulk);
+
+// --- Descargar plantilla .xlsx con las cabeceras exactas ---
+document.getElementById('btn-descargar-plantilla').addEventListener('click', () => {
+  const wb = XLSX.utils.book_new();
+  const wsData = [HEADERS_ORDER];
+  const wsDatos = XLSX.utils.aoa_to_sheet(wsData);
+  wsDatos['!cols'] = HEADERS_ORDER.map(() => ({ wch: 22 }));
+  XLSX.utils.book_append_sheet(wb, wsDatos, 'DATA');
+
+  const ayuda = [
+    ['Valores válidos para "Tipo de Recepcion"'],
+    ...(META.tipos && META.tipos.length ? META.tipos : [
+      '1. INGRESO IMPORTACION', '2. INGRESO COMPRA LOCAL', '3. INGRESO OFERTA', '4. INGRESO DEVOLUCION'
+    ]).map(t => [t]),
+    [],
+    ['Formato de fechas: AAAA-MM-DD (ej. 2026-03-25)'],
+    ['No borres ni renombres las cabeceras de la hoja "DATA".']
+  ];
+  const wsAyuda = XLSX.utils.aoa_to_sheet(ayuda);
+  XLSX.utils.book_append_sheet(wb, wsAyuda, 'Instrucciones');
+
+  XLSX.writeFile(wb, 'plantilla_indicadores_ingresos.xlsx');
+});
+
+// --- Subir plantilla completada ---
+document.getElementById('input-plantilla').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const msg = document.getElementById('bulk-msg');
+  msg.textContent = 'Leyendo archivo...';
+  msg.className = 'text-body-sm text-outline';
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      const sheetName = wb.SheetNames.includes('DATA') ? 'DATA' : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      const clean = rows
+        .filter(r => Object.values(r).some(v => String(v).trim() !== ''))
+        .map(r => {
+          const obj = {};
+          HEADERS_ORDER.forEach(h => {
+            let v = r[h] !== undefined ? r[h] : '';
+            if (v instanceof Date) v = v.toISOString().slice(0, 10);
+            obj[h] = v;
+          });
+          return obj;
+        });
+
+      if (!clean.length) {
+        msg.textContent = 'No se encontraron filas con datos en la hoja "DATA".';
+        msg.className = 'text-body-sm text-error font-semibold';
+        return;
+      }
+
+      bulkRecords = clean;
+      renderBulkPreview(clean);
+      msg.textContent = `${clean.length} fila(s) detectada(s). Revisa la previsualización y confirma.`;
+      msg.className = 'text-body-sm text-secondary font-semibold';
+      openModalBulk();
+    } catch (err) {
+      msg.textContent = 'No se pudo leer el archivo: ' + err.message;
+      msg.className = 'text-body-sm text-error font-semibold';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function renderBulkPreview(rows) {
+  const cols = ['Mes', 'Negocio', 'Documento de Ingreso', 'Tipo de Recepcion', 'Fecha de recepcion', 'Suma de Unidades'];
+  let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0"><tr>';
+  cols.forEach(c => html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant">${c}</th>`);
+  html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
+  rows.slice(0, 50).forEach(r => {
+    html += '<tr class="zebra-stripe">';
+    cols.forEach(c => html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r[c] ?? ''}</td>`);
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  if (rows.length > 50) html += `<p class="p-3 text-body-sm text-outline">... y ${rows.length - 50} fila(s) más.</p>`;
+
+  document.getElementById('bulk-preview-wrap').innerHTML = html;
+  document.getElementById('bulk-count').textContent = `(${rows.length})`;
+}
+
+document.getElementById('btn-confirmar-carga').addEventListener('click', async () => {
+  const msg = document.getElementById('bulk-msg');
+  if (!bulkRecords.length) return;
+  msg.textContent = 'Guardando ' + bulkRecords.length + ' registro(s)...';
+  msg.className = 'text-body-sm text-outline';
+  try {
+    const result = await apiPost(bulkRecords);
+    if (result.ok) {
+      msg.textContent = '✔ ' + result.message;
+      msg.className = 'text-body-sm text-secondary font-semibold';
+      bulkRecords = [];
+      document.getElementById('input-plantilla').value = '';
+      closeModalBulk();
+      loadDashboard();
+    } else {
+      throw new Error(result.error || 'Error desconocido');
+    }
+  } catch (err) {
+    msg.textContent = '✖ Error al guardar: ' + err.message;
+    msg.className = 'text-body-sm text-error font-semibold';
+  }
+});
+
+// ---------- Render de tabla genérica (Historial) ----------
+function renderTable(rows, containerId) {
+  const container = document.getElementById(containerId);
+  if (!rows.length) {
+    container.innerHTML = '<p class="p-6 text-body-sm text-outline">No hay registros para mostrar.</p>';
+    return;
+  }
+  const cols = ['Mes','Negocio','Documento de Ingreso','Tipo de Recepcion','Fecha de recepcion','Suma de Unidades','Status de cumplimiento'];
+  let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
+  cols.forEach(c => html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant">${c}</th>`);
+  html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant text-center">Acciones</th>`;
+  html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
+  rows.forEach((r, i) => {
+    html += '<tr class="zebra-stripe hover:bg-surface-container-highest transition-colors">';
+    cols.forEach(c => html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r[c] ?? ''}</td>`);
+    html += `<td class="p-table-cell-padding text-center"><button data-hist-idx="${i}" class="btn-editar-hist material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  container.querySelectorAll('.btn-editar-hist').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.histIdx);
+      openModalRegistro('edit', rows[idx]);
+    });
+  });
+}
+
+// ---------- Render de la tabla de Detalle en el Dashboard ----------
+function statusBadge(status) {
+  const s = String(status || '').toUpperCase();
+  if (s.includes('CUMPLIDO') && !s.includes('NO CUMPLIDO') && !s.includes('INCUMPLIDO')) {
+    return `<span class="px-3 py-1 bg-secondary text-on-secondary rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
+  }
+  if (s.includes('PENDIENTE')) {
+    return `<span class="px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
+  }
+  if (s.includes('NO CUMPLIDO') || s.includes('INCUMPLIDO')) {
+    return `<span class="px-3 py-1 bg-error-container text-on-error-container rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
+  }
+  return `<span class="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
+}
+
+function renderDashboardTable(rows) {
+  const container = document.getElementById('dashboard-table-wrap');
+  if (!rows.length) {
+    container.innerHTML = '<p class="p-6 text-body-sm text-outline">No hay registros para mostrar.</p>';
+    return;
+  }
+  let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
+  ['Mes','Negocio','Documento','Contenedor / Referencia','Guía','Lead Time','Fecha Recep.','Status','Acciones'].forEach((c) => {
+    const align = (c === 'Lead Time' || c === 'Acciones') ? 'text-center' : '';
+    html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant ${align}">${c}</th>`;
+  });
+  html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
+  rows.forEach((r, i) => {
+    const refCode = r['Numero de Contenedor'] || r['Numero de referencia'] || r['Numero guia'] || '';
+    html += '<tr class="zebra-stripe hover:bg-surface-container-highest transition-colors">';
+    html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r['Mes'] ?? ''}</td>`;
+    html += `<td class="p-table-cell-padding font-body-sm font-bold text-primary">${r['Negocio'] ?? ''}</td>`;
+    html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r['Documento de Ingreso'] ?? ''}</td>`;
+    html += `<td class="p-table-cell-padding"><div class="flex flex-col"><span class="text-body-sm font-medium">${r['Tipo de Recepcion'] ?? ''}</span><span class="text-[11px] text-outline font-data-mono">${refCode}</span></div></td>`;
+    html += `<td class="p-table-cell-padding font-data-mono text-body-sm text-outline-variant">${r['Numero guia'] ?? ''}</td>`;
+    html += `<td class="p-table-cell-padding text-center"><span class="px-2 py-1 bg-surface-container rounded font-data-mono text-body-sm font-bold text-primary">${r['Lead Time'] ?? ''}</span></td>`;
+    html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${formatFechaDisplay(r['Fecha de recepcion'])}</td>`;
+    html += `<td class="p-table-cell-padding">${statusBadge(r['Status de cumplimiento'])}</td>`;
+    html += `<td class="p-table-cell-padding text-center"><button data-dash-idx="${i}" class="btn-editar-dash material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  container.querySelectorAll('.btn-editar-dash').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.dashIdx);
+      openModalRegistro('edit', rows[idx]);
+    });
+  });
+}
+
+function formatFechaDisplay(f) {
+  if (!f) return '';
+  const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return f;
+}
+
+// ---------- Tarjetas de resumen (Ingresos / Devoluciones por mes) ----------
+function ultimosMesesConDatos(data, n) {
+  const presentes = [...new Set(data.map(r => String(r['Mes'] || '').toUpperCase()))]
+    .filter(m => MESES_ORDEN.includes(m))
+    .sort((a, b) => MESES_ORDEN.indexOf(a) - MESES_ORDEN.indexOf(b));
+  return presentes.slice(-n).reverse(); // más reciente primero
+}
+
+function renderResumenMensual(containerId, data, meses, opts) {
+  const container = document.getElementById(containerId);
+  let html = '<div class="space-y-4">';
+  meses.forEach((mes, i) => {
+    const rows = data.filter(r => String(r['Mes'] || '').toUpperCase() === mes);
+    const u = sum(rows, opts.unidadKey);
+    const b = sum(rows, 'Cantidad de Bultos');
+    const p = sum(rows, 'Cantidad de Paletas');
+    const destacado = i === 0;
+    const labelU = opts.labelUnidad;
+    if (destacado) {
+      html += `<div class="p-3 ${opts.bgDestacado} rounded-lg">
+        <div class="flex justify-between items-center mb-2"><span class="text-body-sm font-bold ${opts.textDestacado}">${titleCase(mes)}</span></div>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="flex flex-col"><span class="text-[10px] ${opts.mutedText} uppercase">${labelU}</span><span class="font-data-mono text-body-sm font-bold">${u.toLocaleString()}</span></div>
+          <div class="flex flex-col border-x border-outline-variant"><span class="text-[10px] ${opts.mutedText} uppercase">Bultos</span><span class="font-data-mono text-body-sm font-bold">${b.toLocaleString()}</span></div>
+          <div class="flex flex-col"><span class="text-[10px] ${opts.mutedText} uppercase">Paletas</span><span class="font-data-mono text-body-sm font-bold">${p.toLocaleString()}</span></div>
+        </div></div>`;
+    } else {
+      html += `<div class="p-3">
+        <div class="flex justify-between items-center mb-2"><span class="text-body-sm font-medium">${titleCase(mes)}</span></div>
+        <div class="grid grid-cols-3 gap-2 text-center opacity-70">
+          <div class="flex flex-col"><span class="text-[10px] text-outline uppercase">${labelU}</span><span class="font-data-mono text-body-sm">${u.toLocaleString()}</span></div>
+          <div class="flex flex-col border-x border-outline-variant"><span class="text-[10px] text-outline uppercase">Bultos</span><span class="font-data-mono text-body-sm">${b.toLocaleString()}</span></div>
+          <div class="flex flex-col"><span class="text-[10px] text-outline uppercase">Paletas</span><span class="font-data-mono text-body-sm">${p.toLocaleString()}</span></div>
+        </div></div>`;
+    }
+  });
+  html += '</div>';
+  if (!meses.length) html = '<p class="text-body-sm text-outline">Sin datos aún.</p>';
+  container.innerHTML = html;
+}
+
+function titleCase(s) { return s ? s.charAt(0) + s.slice(1).toLowerCase() : s; }
+
+// ---------- Dashboard ----------
+async function loadDashboard() {
+  setStatus(false, 'Conectando...');
+  try {
+    const res = await apiGet({});
+    setStatus(true, 'Conectado');
+    const data = res.data || [];
+    dashboardData = data;
+    currentData = data;
+
+    const devoluciones = data.filter(isDevolucionRow);
+    const ingresos = data.filter(r => !isDevolucionRow(r));
+
+    const mesesIngresos = ultimosMesesConDatos(ingresos, 3);
+    renderResumenMensual('card-ingresos', ingresos, mesesIngresos, {
+      unidadKey: 'Suma de Unidades', labelUnidad: 'Unid.',
+      bgDestacado: 'bg-surface-container-low', textDestacado: 'text-primary', mutedText: 'text-outline'
+    });
+
+    const mesesDevoluciones = ultimosMesesConDatos(devoluciones, 3);
+    renderResumenMensual('card-devoluciones', devoluciones, mesesDevoluciones, {
+      unidadKey: 'Suma de Unidades', labelUnidad: 'Reg.',
+      bgDestacado: 'bg-error-container/30', textDestacado: 'text-error', mutedText: 'text-error/70'
+    });
+
+    const anioActual = new Date().getFullYear();
+    document.getElementById('card-total-year').textContent = anioActual;
+    document.getElementById('card-total').innerHTML = `
+      <div class="space-y-2">
+        <p class="text-[10px] font-bold text-primary uppercase tracking-tighter">Total Ingresos</p>
+        <div class="flex flex-col">
+          <span class="text-body-sm font-medium">${ingresos.length} Docs.</span>
+          <span class="text-headline-md font-bold text-primary">${formatK(sum(ingresos,'Suma de Unidades'))} <span class="text-body-sm font-normal">Unid.</span></span>
+          <span class="text-body-sm text-outline">${sum(ingresos,'Cantidad de Paletas').toLocaleString()} Paletas</span>
+        </div>
+      </div>
+      <div class="space-y-2 border-l border-outline-variant pl-4">
+        <p class="text-[10px] font-bold text-error uppercase tracking-tighter">Total Devoluciones</p>
+        <div class="flex flex-col">
+          <span class="text-body-sm font-medium">${devoluciones.length} Reg.</span>
+          <span class="text-headline-md font-bold text-error">${formatK(sum(devoluciones,'Suma de Unidades'))} <span class="text-body-sm font-normal">Unid.</span></span>
+          <span class="text-body-sm text-outline">${sum(devoluciones,'Cantidad de Paletas').toLocaleString()} Paletas</span>
+        </div>
+      </div>`;
+
+    const totalReg = data.length;
+    const cumplidos = data.filter(r => {
+      const s = String(r['Status de cumplimiento']).toUpperCase();
+      return s.includes('CUMPLIDO') && !s.includes('NO CUMPLIDO');
+    }).length;
+    const eficiencia = totalReg ? Math.round((cumplidos / totalReg) * 1000) / 10 : 0;
+    document.getElementById('eficiencia-pct').textContent = eficiencia + '%';
+    document.getElementById('eficiencia-bar').style.width = eficiencia + '%';
+
+    applyDashboardFilters();
+  } catch (err) {
+    setStatus(false, 'Error de conexión');
+    document.getElementById('dashboard-table-wrap').innerHTML =
+      `<p class="p-6 text-body-sm text-error">No se pudo conectar al backend. Verifica CONFIG.API_URL en el código.<br>${err.message}</p>`;
+  }
+}
+
+function formatK(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return n.toLocaleString();
+}
+
+// ---------- Filtros del Dashboard ----------
+document.getElementById('btn-filtrar-dash').addEventListener('click', applyDashboardFilters);
+function applyDashboardFilters() {
+  const desde = val('d-desde'), hasta = val('d-hasta'), mes = val('d-mes');
+  let rows = dashboardData.slice();
+  if (mes) rows = rows.filter(r => String(r['Mes'] || '').toUpperCase() === mes.toUpperCase());
+  if (desde) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') >= desde);
+  if (hasta) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') <= hasta);
+
+  const hasFilter = !!(desde || hasta || mes);
+  const displayRows = hasFilter ? rows.slice().reverse() : rows.slice(-15).reverse();
+  dashboardFiltered = displayRows;
+
+  renderDashboardTable(displayRows);
+  document.getElementById('dashboard-count').textContent =
+    `Mostrando ${displayRows.length} de ${dashboardData.length} registros`;
+}
+
+// ---------- Exportar CSV desde el Dashboard ----------
+document.getElementById('btn-exportar-dash').addEventListener('click', () => {
+  if (!dashboardFiltered.length) { alert('No hay datos para exportar.'); return; }
+  exportCSV(dashboardFiltered, `indicadores_ingresos_dashboard_${new Date().toISOString().slice(0,10)}.csv`);
+});
+
+function exportCSV(rows, filename) {
+  const cols = HEADERS_ORDER;
+  const csvRows = [cols.join(',')];
+  rows.forEach(r => {
+    csvRows.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
+  });
+  const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+// ---------- Historial con filtros ----------
+document.getElementById('btn-filtrar').addEventListener('click', loadHistorial);
+async function loadHistorial() {
+  const wrap = document.getElementById('historial-table-wrap');
+  wrap.innerHTML = 'Cargando...';
+  const params = {
+    desde: val('h-desde'), hasta: val('h-hasta'), mes: val('h-mes'),
+    tipo: val('h-tipo'), negocio: val('h-negocio'), q: val('h-q')
+  };
+  try {
+    const res = await apiGet(params);
+    currentData = res.data || [];
+    renderTable(currentData, 'historial-table-wrap');
+    document.getElementById('historial-count').textContent = `${currentData.length} registros`;
+  } catch (err) {
+    wrap.innerHTML = `<p class="p-6 text-body-sm text-error">Error al filtrar: ${err.message}</p>`;
+  }
+}
+
+// ---------- Exportar CSV (de lo actualmente filtrado en Historial) ----------
+document.getElementById('btn-exportar').addEventListener('click', () => {
+  if (!currentData.length) { alert('No hay datos para exportar. Aplica un filtro primero.'); return; }
+  exportCSV(currentData, `indicadores_ingresos_${new Date().toISOString().slice(0,10)}.csv`);
+});
+
+// ---------- Init ----------
+(async function init() {
+  if (CONFIG.API_URL.includes('PEGA_AQUI')) {
+    setStatus(false, 'Falta configurar API_URL');
+    document.getElementById('dashboard-table-wrap').innerHTML =
+      '<p class="p-6 text-body-sm text-error">Configura CONFIG.API_URL con la URL de tu Web App de Apps Script (ver README).</p>';
+    return;
+  }
+  await loadMeta();
+  await loadDashboard();
+})();
+</script>
+</body>
+</html>
