@@ -176,7 +176,7 @@
         </div>
         <div class="px-6 py-4 bg-surface-container-lowest border-b border-outline-variant flex flex-wrap items-end gap-4">
           <div class="flex flex-col gap-1">
-            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Rango de Fechas</label>
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Rango de Fechas (Emisión NI)</label>
             <div class="flex items-center gap-2">
               <input type="date" id="d-desde" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
               <span class="text-outline">-</span>
@@ -218,7 +218,7 @@
               <span class="material-symbols-outlined text-body-sm">filter_list</span> Aplicar Filtros
             </button>
             <button id="btn-exportar" class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2">
-              <span class="material-symbols-outlined text-body-sm">download</span> Exportar CSV
+              <span class="material-symbols-outlined text-body-sm">download</span> Exportar XLS
             </button>
           </div>
         </div>
@@ -847,7 +847,7 @@ function renderDashboardTable(rows, containerId) {
   }
   let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
   html += `<th class="p-table-cell-padding w-8"><input type="checkbox" class="table-select-all"></th>`;
-  ['Mes','Negocio','Documento','Contenedor / Referencia','Guía','Lead Time','Fecha Recep.','Status','Acciones'].forEach((c) => {
+  ['Mes','Negocio','Documento','Contenedor / Referencia','Guía','Lead Time','Fecha Emisión NI','Status','Acciones'].forEach((c) => {
     const align = (c === 'Lead Time' || c === 'Acciones') ? 'text-center' : '';
     html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant ${align}">${c}</th>`;
   });
@@ -862,7 +862,7 @@ function renderDashboardTable(rows, containerId) {
     html += `<td class="p-table-cell-padding"><div class="flex flex-col"><span class="text-body-sm font-medium">${r['Tipo de Recepcion'] ?? ''}</span><span class="text-[11px] text-outline font-data-mono">${refCode}</span></div></td>`;
     html += `<td class="p-table-cell-padding font-data-mono text-body-sm text-outline-variant">${r['Numero guia'] ?? ''}</td>`;
     html += `<td class="p-table-cell-padding text-center"><span class="px-2 py-1 bg-surface-container rounded font-data-mono text-body-sm font-bold text-primary">${r['Lead Time'] ?? ''}</span></td>`;
-    html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${formatFechaDisplay(r['Fecha de recepcion'])}</td>`;
+    html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${formatFechaDisplay(r['Fecha de Emision de la NI'])}</td>`;
     html += `<td class="p-table-cell-padding">${statusBadge(r['Status de cumplimiento'])}</td>`;
     html += `<td class="p-table-cell-padding text-center"><button data-dash-idx="${i}" class="btn-editar-generic material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
     html += '</tr>';
@@ -881,8 +881,11 @@ function renderDashboardTable(rows, containerId) {
 
 function formatFechaDisplay(f) {
   if (!f) return '';
-  const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const iso = fechaToISO(f);
+  if (iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
   return f;
 }
 
@@ -997,6 +1000,34 @@ function formatK(n) {
   return n.toLocaleString();
 }
 
+// ---------- Normaliza cualquier valor de fecha a 'YYYY-MM-DD' para poder comparar ----------
+// Soporta: 'YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss...', 'DD/MM/YYYY', 'D/M/YYYY',
+// números de serie de Excel/Sheets, y objetos Date. Devuelve '' si no se puede interpretar.
+function fechaToISO(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) {
+    return v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
+  }
+  if (typeof v === 'number' && !isNaN(v)) {
+    // Serial de fecha de Excel/Sheets (días desde 1899-12-30)
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    if (!isNaN(d)) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    return '';
+  }
+  let s = String(v).trim();
+  if (!s) return '';
+  // YYYY-MM-DD (con o sin hora al final)
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  // DD/MM/YYYY o D/M/YYYY
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  // Último intento: dejar que el motor de JS lo interprete
+  const d = new Date(s);
+  if (!isNaN(d)) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return '';
+}
+
 // ---------- Filtros del Dashboard (se aplican automáticamente al cambiar) ----------
 ['d-desde', 'd-hasta', 'd-mes'].forEach(id => {
   document.getElementById(id).addEventListener('change', applyDashboardFilters);
@@ -1010,9 +1041,9 @@ document.getElementById('btn-limpiar-dash').addEventListener('click', () => {
 function applyDashboardFilters() {
   const desde = val('d-desde'), hasta = val('d-hasta'), mes = val('d-mes');
   let rows = dashboardData.slice();
-  if (mes) rows = rows.filter(r => String(r['Mes'] || '').toUpperCase() === mes.toUpperCase());
-  if (desde) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') >= desde);
-  if (hasta) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') <= hasta);
+  if (mes) rows = rows.filter(r => String(r['Mes'] || '').trim().toUpperCase() === mes.toUpperCase());
+  if (desde) rows = rows.filter(r => { const f = fechaToISO(r['Fecha de Emision de la NI']); return f && f >= desde; });
+  if (hasta) rows = rows.filter(r => { const f = fechaToISO(r['Fecha de Emision de la NI']); return f && f <= hasta; });
 
   const hasFilter = !!(desde || hasta || mes);
   const displayRows = hasFilter ? rows.slice().reverse() : rows.slice(-15).reverse();
@@ -1027,20 +1058,33 @@ function applyDashboardFilters() {
 document.getElementById('btn-exportar-dash').addEventListener('click', () => {
   const rows = getExportRows('dashboard-table-wrap', dashboardFiltered);
   if (!rows.length) { alert('No hay datos para exportar.'); return; }
-  exportCSV(rows, `indicadores_ingresos_dashboard_${new Date().toISOString().slice(0,10)}.csv`);
+  const filename = buildKpiFilename(val('d-desde'), val('d-hasta'), val('d-mes'));
+  exportXLS(rows, filename);
 });
 
-function exportCSV(rows, filename) {
+// ---------- Exportar a XLS (usa SheetJS, ya cargado en la página) ----------
+function exportXLS(rows, filename) {
   const cols = HEADERS_ORDER;
-  const csvRows = [cols.join(',')];
-  rows.forEach(r => {
-    csvRows.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
-  });
-  const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
+  const aoa = [cols, ...rows.map(r => cols.map(c => r[c] ?? ''))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(() => ({ wch: 20 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'KPI');
+  XLSX.writeFile(wb, filename, { bookType: 'xls' });
+}
+
+// Construye el nombre de archivo "KPI_..." según el rango de fechas o el mes filtrado.
+// Si no hay ningún filtro activo, usa la fecha de hoy.
+function buildKpiFilename(desde, hasta, mes) {
+  let sufijo;
+  if (desde || hasta) {
+    sufijo = `${desde || 'inicio'}_a_${hasta || 'hoy'}`;
+  } else if (mes) {
+    sufijo = String(mes).trim().replace(/\s+/g, '_');
+  } else {
+    sufijo = new Date().toISOString().slice(0, 10);
+  }
+  return `KPI_${sufijo}.xls`;
 }
 
 // ---------- Historial con filtros ----------
@@ -1066,7 +1110,8 @@ async function loadHistorial() {
 document.getElementById('btn-exportar').addEventListener('click', () => {
   const rows = getExportRows('historial-table-wrap', currentData);
   if (!rows.length) { alert('No hay datos para exportar. Aplica un filtro primero.'); return; }
-  exportCSV(rows, `indicadores_ingresos_${new Date().toISOString().slice(0,10)}.csv`);
+  const filename = buildKpiFilename(val('h-desde'), val('h-hasta'), val('h-mes'));
+  exportXLS(rows, filename);
 });
 
 
@@ -1171,7 +1216,8 @@ function initTipoSections() {
     document.getElementById(cfg.id + '-btn-exportar').addEventListener('click', () => {
       const rows = getExportRows(cfg.id + '-table-wrap', getTipoFiltered(cfg));
       if (!rows.length) { alert('No hay datos para exportar.'); return; }
-      exportCSV(rows, `indicadores_${cfg.id}_${new Date().toISOString().slice(0,10)}.csv`);
+      const filename = buildKpiFilename(val(cfg.id + '-desde'), val(cfg.id + '-hasta'), '');
+      exportXLS(rows, filename);
     });
   });
 }
