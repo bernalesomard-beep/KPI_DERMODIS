@@ -124,7 +124,7 @@
             <span class="text-table-header text-primary uppercase font-bold tracking-widest">Resumen Ingresos</span>
             <span class="material-symbols-outlined text-secondary">trending_up</span>
           </div>
-          <div id="card-ingresos" class="space-y-4">Cargando…</div>
+          <div id="card-ingresos" class="space-y-4 max-h-72 overflow-y-auto pr-1">Cargando…</div>
         </div>
         <div class="lg:col-span-4 glass-card rounded-xl p-card-padding shadow-sm flex flex-col gap-4">
           <div class="flex items-center justify-between">
@@ -147,7 +147,7 @@
             <span class="text-table-header text-error uppercase font-bold tracking-widest">Devoluciones</span>
             <span class="material-symbols-outlined text-error">assignment_return</span>
           </div>
-          <div id="card-devoluciones" class="space-y-4">Cargando…</div>
+          <div id="card-devoluciones" class="space-y-4 max-h-72 overflow-y-auto pr-1">Cargando…</div>
         </div>
       </div>
 
@@ -187,7 +187,9 @@
             <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Mes</label>
             <select id="d-mes" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm min-w-[140px]"><option value="">Todos los meses</option></select>
           </div>
-          <button id="btn-filtrar-dash" class="px-4 py-1.5 bg-surface-container-high text-primary rounded-lg text-body-sm font-bold hover:bg-surface-container-highest transition-colors">Aplicar Filtros</button>
+          <button id="btn-limpiar-dash" class="px-4 py-1.5 bg-surface border border-outline-variant text-on-surface-variant rounded-lg text-body-sm font-bold hover:bg-surface-container-high transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-body-sm">filter_alt_off</span> Limpiar Filtros
+          </button>
           <span id="bulk-msg" class="text-body-sm ml-auto"></span>
         </div>
         <div class="overflow-x-auto max-h-[500px]" id="dashboard-table-wrap">Cargando datos…</div>
@@ -657,9 +659,35 @@ document.getElementById('input-plantilla').addEventListener('change', (e) => {
         return;
       }
 
+      // ---- Detección de "Documento de Ingreso" duplicados ----
+      // 1) contra lo que ya existe en el Sheet (dashboardData)
+      // 2) contra otras filas del mismo archivo subido
+      const existentes = new Set(
+        dashboardData.map(r => String(r['Documento de Ingreso'] || '').trim().toUpperCase()).filter(Boolean)
+      );
+      const vistosEnArchivo = new Set();
+      clean.forEach(r => {
+        const doc = String(r['Documento de Ingreso'] || '').trim().toUpperCase();
+        if (!doc) {
+          r._status = 'sin_documento';
+        } else if (existentes.has(doc)) {
+          r._status = 'duplicado_sheet';
+        } else if (vistosEnArchivo.has(doc)) {
+          r._status = 'duplicado_archivo';
+        } else {
+          r._status = 'nuevo';
+          vistosEnArchivo.add(doc);
+        }
+      });
+
       bulkRecords = clean;
       renderBulkPreview(clean);
-      msg.textContent = `${clean.length} fila(s) detectada(s). Revisa la previsualización y confirma.`;
+
+      const nuevos = clean.filter(r => r._status === 'nuevo' || r._status === 'sin_documento').length;
+      const dups = clean.length - nuevos;
+      msg.textContent = dups > 0
+        ? `${clean.length} fila(s) detectada(s): ${nuevos} se registrarán, ${dups} duplicada(s) se omitirán.`
+        : `${clean.length} fila(s) detectada(s), todas nuevas. Revisa y confirma.`;
       msg.className = 'text-body-sm text-secondary font-semibold';
       openModalBulk();
     } catch (err) {
@@ -670,32 +698,49 @@ document.getElementById('input-plantilla').addEventListener('change', (e) => {
   reader.readAsArrayBuffer(file);
 });
 
+function bulkStatusBadge(status) {
+  if (status === 'duplicado_sheet') return `<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded-full text-[11px] font-bold">Duplicado (ya existe)</span>`;
+  if (status === 'duplicado_archivo') return `<span class="px-2 py-0.5 bg-error-container text-on-error-container rounded-full text-[11px] font-bold">Duplicado (en archivo)</span>`;
+  if (status === 'sin_documento') return `<span class="px-2 py-0.5 bg-tertiary-container text-on-tertiary-container rounded-full text-[11px] font-bold">Sin documento</span>`;
+  return `<span class="px-2 py-0.5 bg-secondary text-on-secondary rounded-full text-[11px] font-bold">Nuevo</span>`;
+}
+
 function renderBulkPreview(rows) {
   const cols = ['Mes', 'Negocio', 'Documento de Ingreso', 'Tipo de Recepcion', 'Fecha de recepcion', 'Suma de Unidades'];
   let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0"><tr>';
+  html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant">Estado</th>`;
   cols.forEach(c => html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant">${c}</th>`);
   html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
-  rows.slice(0, 50).forEach(r => {
-    html += '<tr class="zebra-stripe">';
+  rows.slice(0, 100).forEach(r => {
+    const esDuplicado = r._status === 'duplicado_sheet' || r._status === 'duplicado_archivo';
+    html += `<tr class="zebra-stripe ${esDuplicado ? 'opacity-60' : ''}">`;
+    html += `<td class="p-table-cell-padding">${bulkStatusBadge(r._status)}</td>`;
     cols.forEach(c => html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r[c] ?? ''}</td>`);
     html += '</tr>';
   });
   html += '</tbody></table>';
-  if (rows.length > 50) html += `<p class="p-3 text-body-sm text-outline">... y ${rows.length - 50} fila(s) más.</p>`;
+  if (rows.length > 100) html += `<p class="p-3 text-body-sm text-outline">... y ${rows.length - 100} fila(s) más.</p>`;
 
   document.getElementById('bulk-preview-wrap').innerHTML = html;
-  document.getElementById('bulk-count').textContent = `(${rows.length})`;
+  const insertables = rows.filter(r => r._status === 'nuevo' || r._status === 'sin_documento').length;
+  document.getElementById('bulk-count').textContent = `(${insertables} de ${rows.length})`;
 }
 
 document.getElementById('btn-confirmar-carga').addEventListener('click', async () => {
   const msg = document.getElementById('bulk-msg');
-  if (!bulkRecords.length) return;
-  msg.textContent = 'Guardando ' + bulkRecords.length + ' registro(s)...';
+  const aInsertar = bulkRecords
+    .filter(r => r._status === 'nuevo' || r._status === 'sin_documento')
+    .map(r => { const copy = Object.assign({}, r); delete copy._status; return copy; });
+
+  if (!aInsertar.length) { msg.textContent = 'No hay filas nuevas para registrar (todas eran duplicadas).'; msg.className = 'text-body-sm text-error font-semibold'; return; }
+
+  const omitidas = bulkRecords.length - aInsertar.length;
+  msg.textContent = 'Guardando ' + aInsertar.length + ' registro(s)...';
   msg.className = 'text-body-sm text-outline';
   try {
-    const result = await apiPost(bulkRecords);
+    const result = await apiPost(aInsertar);
     if (result.ok) {
-      msg.textContent = '✔ ' + result.message;
+      msg.textContent = '✔ ' + result.message + (omitidas > 0 ? ` (${omitidas} duplicada(s) omitida(s))` : '');
       msg.className = 'text-body-sm text-secondary font-semibold';
       bulkRecords = [];
       document.getElementById('input-plantilla').value = '';
@@ -710,20 +755,56 @@ document.getElementById('btn-confirmar-carga').addEventListener('click', async (
   }
 });
 
+// ---------- Selección de filas (checkboxes) para exportar solo lo elegido ----------
+const tableRowsCache = {};   // containerId -> array de filas actualmente renderizadas
+const rowSelections = {};    // containerId -> Set de índices seleccionados (dentro de tableRowsCache)
+
+function getExportRows(containerId, fallbackAll) {
+  const rows = tableRowsCache[containerId] || fallbackAll || [];
+  const sel = rowSelections[containerId];
+  if (sel && sel.size > 0) return rows.filter((_, i) => sel.has(i));
+  return rows;
+}
+
+function wireSelectionCheckboxes(container, containerId, rows) {
+  tableRowsCache[containerId] = rows;
+  rowSelections[containerId] = new Set();
+  const selectAllEl = container.querySelector('.table-select-all');
+  const rowChecks = container.querySelectorAll('.table-row-check');
+  if (!selectAllEl) return;
+  selectAllEl.addEventListener('change', () => {
+    rowChecks.forEach(cb => { cb.checked = selectAllEl.checked; });
+    rowSelections[containerId] = selectAllEl.checked
+      ? new Set(rows.map((_, i) => i))
+      : new Set();
+  });
+  rowChecks.forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = Number(cb.dataset.idx);
+      if (cb.checked) rowSelections[containerId].add(idx); else rowSelections[containerId].delete(idx);
+      selectAllEl.checked = rowSelections[containerId].size === rows.length && rows.length > 0;
+    });
+  });
+}
+
 // ---------- Render de tabla genérica (Historial) ----------
 function renderTable(rows, containerId) {
   const container = document.getElementById(containerId);
   if (!rows.length) {
     container.innerHTML = '<p class="p-6 text-body-sm text-outline">No hay registros para mostrar.</p>';
+    tableRowsCache[containerId] = [];
+    rowSelections[containerId] = new Set();
     return;
   }
   const cols = ['Mes','Negocio','Documento de Ingreso','Tipo de Recepcion','Fecha de recepcion','Suma de Unidades','Status de cumplimiento'];
   let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
+  html += `<th class="p-table-cell-padding w-8"><input type="checkbox" class="table-select-all"></th>`;
   cols.forEach(c => html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant">${c}</th>`);
   html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant text-center">Acciones</th>`;
   html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
   rows.forEach((r, i) => {
     html += '<tr class="zebra-stripe hover:bg-surface-container-highest transition-colors">';
+    html += `<td class="p-table-cell-padding"><input type="checkbox" class="table-row-check" data-idx="${i}"></td>`;
     cols.forEach(c => html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r[c] ?? ''}</td>`);
     html += `<td class="p-table-cell-padding text-center"><button data-hist-idx="${i}" class="btn-editar-hist material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
     html += '</tr>';
@@ -737,6 +818,7 @@ function renderTable(rows, containerId) {
       openModalRegistro('edit', rows[idx]);
     });
   });
+  wireSelectionCheckboxes(container, containerId, rows);
 }
 
 // ---------- Render de la tabla de Detalle en el Dashboard ----------
@@ -759,9 +841,12 @@ function renderDashboardTable(rows, containerId) {
   const container = document.getElementById(containerId);
   if (!rows.length) {
     container.innerHTML = '<p class="p-6 text-body-sm text-outline">No hay registros para mostrar.</p>';
+    tableRowsCache[containerId] = [];
+    rowSelections[containerId] = new Set();
     return;
   }
   let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
+  html += `<th class="p-table-cell-padding w-8"><input type="checkbox" class="table-select-all"></th>`;
   ['Mes','Negocio','Documento','Contenedor / Referencia','Guía','Lead Time','Fecha Recep.','Status','Acciones'].forEach((c) => {
     const align = (c === 'Lead Time' || c === 'Acciones') ? 'text-center' : '';
     html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant ${align}">${c}</th>`;
@@ -770,6 +855,7 @@ function renderDashboardTable(rows, containerId) {
   rows.forEach((r, i) => {
     const refCode = r['Numero de Contenedor'] || r['Numero de referencia'] || r['Numero guia'] || '';
     html += '<tr class="zebra-stripe hover:bg-surface-container-highest transition-colors">';
+    html += `<td class="p-table-cell-padding"><input type="checkbox" class="table-row-check" data-idx="${i}"></td>`;
     html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r['Mes'] ?? ''}</td>`;
     html += `<td class="p-table-cell-padding font-body-sm font-bold text-primary">${r['Negocio'] ?? ''}</td>`;
     html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${r['Documento de Ingreso'] ?? ''}</td>`;
@@ -790,6 +876,7 @@ function renderDashboardTable(rows, containerId) {
       openModalRegistro('edit', rows[idx]);
     });
   });
+  wireSelectionCheckboxes(container, containerId, rows);
 }
 
 function formatFechaDisplay(f) {
@@ -855,13 +942,13 @@ async function loadDashboard() {
     const devoluciones = data.filter(isDevolucionRow);
     const ingresos = data.filter(r => !isDevolucionRow(r));
 
-    const mesesIngresos = ultimosMesesConDatos(ingresos, 3);
+    const mesesIngresos = ultimosMesesConDatos(ingresos, 12);
     renderResumenMensual('card-ingresos', ingresos, mesesIngresos, {
       unidadKey: 'Suma de Unidades', labelUnidad: 'Unid.',
       bgDestacado: 'bg-surface-container-low', textDestacado: 'text-primary', mutedText: 'text-outline'
     });
 
-    const mesesDevoluciones = ultimosMesesConDatos(devoluciones, 3);
+    const mesesDevoluciones = ultimosMesesConDatos(devoluciones, 12);
     renderResumenMensual('card-devoluciones', devoluciones, mesesDevoluciones, {
       unidadKey: 'Suma de Unidades', labelUnidad: 'Reg.',
       bgDestacado: 'bg-error-container/30', textDestacado: 'text-error', mutedText: 'text-error/70'
@@ -910,8 +997,16 @@ function formatK(n) {
   return n.toLocaleString();
 }
 
-// ---------- Filtros del Dashboard ----------
-document.getElementById('btn-filtrar-dash').addEventListener('click', applyDashboardFilters);
+// ---------- Filtros del Dashboard (se aplican automáticamente al cambiar) ----------
+['d-desde', 'd-hasta', 'd-mes'].forEach(id => {
+  document.getElementById(id).addEventListener('change', applyDashboardFilters);
+});
+document.getElementById('btn-limpiar-dash').addEventListener('click', () => {
+  document.getElementById('d-desde').value = '';
+  document.getElementById('d-hasta').value = '';
+  document.getElementById('d-mes').value = '';
+  applyDashboardFilters();
+});
 function applyDashboardFilters() {
   const desde = val('d-desde'), hasta = val('d-hasta'), mes = val('d-mes');
   let rows = dashboardData.slice();
@@ -930,8 +1025,9 @@ function applyDashboardFilters() {
 
 // ---------- Exportar CSV desde el Dashboard ----------
 document.getElementById('btn-exportar-dash').addEventListener('click', () => {
-  if (!dashboardFiltered.length) { alert('No hay datos para exportar.'); return; }
-  exportCSV(dashboardFiltered, `indicadores_ingresos_dashboard_${new Date().toISOString().slice(0,10)}.csv`);
+  const rows = getExportRows('dashboard-table-wrap', dashboardFiltered);
+  if (!rows.length) { alert('No hay datos para exportar.'); return; }
+  exportCSV(rows, `indicadores_ingresos_dashboard_${new Date().toISOString().slice(0,10)}.csv`);
 });
 
 function exportCSV(rows, filename) {
@@ -966,11 +1062,13 @@ async function loadHistorial() {
   }
 }
 
-// ---------- Exportar CSV (de lo actualmente filtrado en Historial) ----------
+// ---------- Exportar CSV (de lo actualmente filtrado/seleccionado en Historial) ----------
 document.getElementById('btn-exportar').addEventListener('click', () => {
-  if (!currentData.length) { alert('No hay datos para exportar. Aplica un filtro primero.'); return; }
-  exportCSV(currentData, `indicadores_ingresos_${new Date().toISOString().slice(0,10)}.csv`);
+  const rows = getExportRows('historial-table-wrap', currentData);
+  if (!rows.length) { alert('No hay datos para exportar. Aplica un filtro primero.'); return; }
+  exportCSV(rows, `indicadores_ingresos_${new Date().toISOString().slice(0,10)}.csv`);
 });
+
 
 // ======================================================================
 // SECCIONES POR TIPO DE RECEPCIÓN (Importación / Compra Local / Pack-Ofertas / Devolución)
@@ -1044,7 +1142,9 @@ function buildTipoSection(cfg) {
             <input type="date" id="${cfg.id}-hasta" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
           </div>
         </div>
-        <button id="${cfg.id}-btn-filtrar" class="px-4 py-1.5 bg-surface-container-high ${accentText} rounded-lg text-body-sm font-bold hover:bg-surface-container-highest transition-colors">Aplicar Filtros</button>
+        <button id="${cfg.id}-btn-limpiar" class="px-4 py-1.5 bg-surface border border-outline-variant text-on-surface-variant rounded-lg text-body-sm font-bold hover:bg-surface-container-high transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined text-body-sm">filter_alt_off</span> Limpiar Filtros
+        </button>
       </div>
       <div class="overflow-x-auto max-h-[500px]" id="${cfg.id}-table-wrap">Cargando datos…</div>
       <div class="p-4 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-between">
@@ -1060,9 +1160,16 @@ function initTipoSections() {
     document.getElementById(cfg.id + '-btn-nuevo').addEventListener('click', () => {
       openModalRegistro('new', null, tipoValorPorNumero(cfg.num));
     });
-    document.getElementById(cfg.id + '-btn-filtrar').addEventListener('click', () => renderTipoView(cfg));
+    [cfg.id + '-desde', cfg.id + '-hasta'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => renderTipoView(cfg));
+    });
+    document.getElementById(cfg.id + '-btn-limpiar').addEventListener('click', () => {
+      document.getElementById(cfg.id + '-desde').value = '';
+      document.getElementById(cfg.id + '-hasta').value = '';
+      renderTipoView(cfg);
+    });
     document.getElementById(cfg.id + '-btn-exportar').addEventListener('click', () => {
-      const rows = getTipoFiltered(cfg);
+      const rows = getExportRows(cfg.id + '-table-wrap', getTipoFiltered(cfg));
       if (!rows.length) { alert('No hay datos para exportar.'); return; }
       exportCSV(rows, `indicadores_${cfg.id}_${new Date().toISOString().slice(0,10)}.csv`);
     });
