@@ -73,6 +73,22 @@
     <a data-view="dashboard" class="nav-link active text-on-surface-variant rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
       <span class="material-symbols-outlined">dashboard</span><span>Dashboard</span>
     </a>
+
+    <p class="px-4 pt-3 pb-1 text-[10px] font-bold text-outline uppercase tracking-widest">Por Tipo de Recepción</p>
+    <a data-view="tipo1" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">local_shipping</span><span>1. Importación</span>
+    </a>
+    <a data-view="tipo2" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">storefront</span><span>2. Compra Local</span>
+    </a>
+    <a data-view="tipo3" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">sell</span><span>3. Pack - Ofertas</span>
+    </a>
+    <a data-view="tipo4" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
+      <span class="material-symbols-outlined">assignment_return</span><span>4. Devoluciones</span>
+    </a>
+
+    <p class="px-4 pt-3 pb-1 text-[10px] font-bold text-outline uppercase tracking-widest">General</p>
     <a data-view="historial" class="nav-link text-on-surface-variant hover:bg-surface-container-highest rounded-lg px-4 py-3 flex items-center gap-4 cursor-pointer transition-all">
       <span class="material-symbols-outlined">history</span><span>Historial y Filtros</span>
     </a>
@@ -180,6 +196,12 @@
         </div>
       </section>
     </section>
+
+    <!-- ===================== VIEWS: POR TIPO DE RECEPCIÓN (generadas por JS) ===================== -->
+    <section id="view-tipo1" class="view space-y-6"></section>
+    <section id="view-tipo2" class="view space-y-6"></section>
+    <section id="view-tipo3" class="view space-y-6"></section>
+    <section id="view-tipo4" class="view space-y-6"></section>
 
     <!-- ===================== VIEW: HISTORIAL / FILTROS ===================== -->
     <section id="view-historial" class="view">
@@ -388,8 +410,13 @@ document.querySelectorAll('.nav-link').forEach(link => {
     const view = link.dataset.view;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + view).classList.add('active');
-    document.getElementById('page-title').textContent =
-      view === 'dashboard' ? 'Dashboard' : 'Historial y Filtros';
+    const titles = {
+      dashboard: 'Dashboard',
+      tipo1: '1. Importación', tipo2: '2. Compra Local',
+      tipo3: '3. Pack - Ofertas', tipo4: '4. Devoluciones',
+      historial: 'Historial y Filtros'
+    };
+    document.getElementById('page-title').textContent = titles[view] || 'Dashboard';
   });
 });
 
@@ -461,7 +488,7 @@ function toggleDevolucionFields() {
 // ======================================================================
 // MODAL: Nuevo registro / Editar registro
 // ======================================================================
-function openModalRegistro(mode, row) {
+function openModalRegistro(mode, row, presetTipo) {
   document.getElementById('form-registro').reset();
   document.getElementById('form-msg').textContent = '';
   if (mode === 'edit' && row) {
@@ -501,6 +528,7 @@ function openModalRegistro(mode, row) {
     document.getElementById('modal-registro-title').textContent = 'Nuevo registro';
     document.getElementById('modal-registro-save-label').textContent = 'Guardar registro';
     editingKey = null;
+    if (presetTipo) document.getElementById('m-tipo').value = presetTipo;
   }
   toggleDevolucionFields();
   document.getElementById('modal-registro').classList.add('active');
@@ -726,8 +754,9 @@ function statusBadge(status) {
   return `<span class="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
 }
 
-function renderDashboardTable(rows) {
-  const container = document.getElementById('dashboard-table-wrap');
+function renderDashboardTable(rows, containerId) {
+  containerId = containerId || 'dashboard-table-wrap';
+  const container = document.getElementById(containerId);
   if (!rows.length) {
     container.innerHTML = '<p class="p-6 text-body-sm text-outline">No hay registros para mostrar.</p>';
     return;
@@ -749,13 +778,13 @@ function renderDashboardTable(rows) {
     html += `<td class="p-table-cell-padding text-center"><span class="px-2 py-1 bg-surface-container rounded font-data-mono text-body-sm font-bold text-primary">${r['Lead Time'] ?? ''}</span></td>`;
     html += `<td class="p-table-cell-padding font-data-mono text-body-sm">${formatFechaDisplay(r['Fecha de recepcion'])}</td>`;
     html += `<td class="p-table-cell-padding">${statusBadge(r['Status de cumplimiento'])}</td>`;
-    html += `<td class="p-table-cell-padding text-center"><button data-dash-idx="${i}" class="btn-editar-dash material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
+    html += `<td class="p-table-cell-padding text-center"><button data-dash-idx="${i}" class="btn-editar-generic material-symbols-outlined text-primary hover:text-secondary text-body-sm align-middle" title="Editar">edit</button></td>`;
     html += '</tr>';
   });
   html += '</tbody></table>';
   container.innerHTML = html;
 
-  container.querySelectorAll('.btn-editar-dash').forEach(btn => {
+  container.querySelectorAll('.btn-editar-generic').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.dataset.dashIdx);
       openModalRegistro('edit', rows[idx]);
@@ -868,6 +897,7 @@ async function loadDashboard() {
     document.getElementById('eficiencia-bar').style.width = eficiencia + '%';
 
     applyDashboardFilters();
+    renderAllTipoViews();
   } catch (err) {
     setStatus(false, 'Error de conexión');
     document.getElementById('dashboard-table-wrap').innerHTML =
@@ -942,6 +972,128 @@ document.getElementById('btn-exportar').addEventListener('click', () => {
   exportCSV(currentData, `indicadores_ingresos_${new Date().toISOString().slice(0,10)}.csv`);
 });
 
+// ======================================================================
+// SECCIONES POR TIPO DE RECEPCIÓN (Importación / Compra Local / Pack-Ofertas / Devolución)
+// Todas leen del mismo dataset (dashboardData), solo filtran por tipo.
+// ======================================================================
+const TIPOS_CONFIG = [
+  { num: 1, id: 'tipo1', label: '1. Importación',   accent: 'primary' },
+  { num: 2, id: 'tipo2', label: '2. Compra Local',   accent: 'primary' },
+  { num: 3, id: 'tipo3', label: '3. Pack - Ofertas', accent: 'primary' },
+  { num: 4, id: 'tipo4', label: '4. Devoluciones',   accent: 'error' }
+];
+
+// Detecta la categoría (1-4) leyendo el número inicial de "Tipo de Recepcion"
+// (ej. "1. INGRESO IMPORTACION" -> 1). Así funciona aunque el texto exacto varíe.
+function tipoCategoria(row) {
+  const t = String(row['Tipo de Recepcion'] || '').trim();
+  const m = t.match(/^(\d)/);
+  return m ? Number(m[1]) : null;
+}
+
+// Busca en META.tipos el valor exacto que empieza con ese número, para preseleccionarlo
+function tipoValorPorNumero(num) {
+  const found = (META.tipos || []).find(t => String(t).trim().match(new RegExp('^' + num + '\\D')));
+  return found || '';
+}
+
+function buildTipoSection(cfg) {
+  const accentText = cfg.accent === 'error' ? 'text-error' : 'text-primary';
+  const accentIcon = cfg.accent === 'error' ? 'assignment_return' : 'inventory_2';
+  return `
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="glass-card rounded-xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold ${accentText} uppercase tracking-widest mb-1">Documentos</p>
+        <p id="${cfg.id}-kpi-docs" class="text-headline-md font-bold ${accentText}">0</p>
+      </div>
+      <div class="glass-card rounded-xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold ${accentText} uppercase tracking-widest mb-1">Unidades</p>
+        <p id="${cfg.id}-kpi-unid" class="text-headline-md font-bold ${accentText}">0</p>
+      </div>
+      <div class="glass-card rounded-xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold ${accentText} uppercase tracking-widest mb-1">Bultos</p>
+        <p id="${cfg.id}-kpi-bultos" class="text-headline-md font-bold ${accentText}">0</p>
+      </div>
+      <div class="glass-card rounded-xl p-4 shadow-sm">
+        <p class="text-[10px] font-bold ${accentText} uppercase tracking-widest mb-1">Paletas</p>
+        <p id="${cfg.id}-kpi-paletas" class="text-headline-md font-bold ${accentText}">0</p>
+      </div>
+    </div>
+
+    <section class="glass-card rounded-xl overflow-hidden shadow-sm">
+      <div class="p-6 border-b border-outline-variant flex items-center justify-between bg-surface-container-low flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined ${accentText}">${accentIcon}</span>
+          <h3 class="font-headline-md text-body-md font-bold ${accentText}">${cfg.label}</h3>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="${cfg.id}-btn-nuevo" class="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-body-sm font-semibold hover:bg-surface-container-high flex items-center gap-2">
+            <span class="material-symbols-outlined text-body-sm">add_circle</span> Nuevo Registro
+          </button>
+          <button id="${cfg.id}-btn-exportar" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+            <span class="material-symbols-outlined text-body-sm">download</span> Exportar
+          </button>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-surface-container-lowest border-b border-outline-variant flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] font-bold ${accentText} uppercase tracking-wider">Rango de Fechas</label>
+          <div class="flex items-center gap-2">
+            <input type="date" id="${cfg.id}-desde" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+            <span class="text-outline">-</span>
+            <input type="date" id="${cfg.id}-hasta" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm">
+          </div>
+        </div>
+        <button id="${cfg.id}-btn-filtrar" class="px-4 py-1.5 bg-surface-container-high ${accentText} rounded-lg text-body-sm font-bold hover:bg-surface-container-highest transition-colors">Aplicar Filtros</button>
+      </div>
+      <div class="overflow-x-auto max-h-[500px]" id="${cfg.id}-table-wrap">Cargando datos…</div>
+      <div class="p-4 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-between">
+        <span id="${cfg.id}-count" class="text-body-sm text-on-surface-variant">Mostrando 0 de 0 registros</span>
+      </div>
+    </section>`;
+}
+
+function initTipoSections() {
+  TIPOS_CONFIG.forEach(cfg => {
+    document.getElementById('view-' + cfg.id).innerHTML = buildTipoSection(cfg);
+
+    document.getElementById(cfg.id + '-btn-nuevo').addEventListener('click', () => {
+      openModalRegistro('new', null, tipoValorPorNumero(cfg.num));
+    });
+    document.getElementById(cfg.id + '-btn-filtrar').addEventListener('click', () => renderTipoView(cfg));
+    document.getElementById(cfg.id + '-btn-exportar').addEventListener('click', () => {
+      const rows = getTipoFiltered(cfg);
+      if (!rows.length) { alert('No hay datos para exportar.'); return; }
+      exportCSV(rows, `indicadores_${cfg.id}_${new Date().toISOString().slice(0,10)}.csv`);
+    });
+  });
+}
+
+function getTipoFiltered(cfg) {
+  const desde = val(cfg.id + '-desde'), hasta = val(cfg.id + '-hasta');
+  let rows = dashboardData.filter(r => tipoCategoria(r) === cfg.num);
+  if (desde) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') >= desde);
+  if (hasta) rows = rows.filter(r => String(r['Fecha de recepcion'] || '') <= hasta);
+  return rows.slice().reverse();
+}
+
+function renderTipoView(cfg) {
+  const rows = getTipoFiltered(cfg);
+  const total = dashboardData.filter(r => tipoCategoria(r) === cfg.num).length;
+
+  document.getElementById(cfg.id + '-kpi-docs').textContent = rows.length.toLocaleString();
+  document.getElementById(cfg.id + '-kpi-unid').textContent = formatK(sum(rows, 'Suma de Unidades'));
+  document.getElementById(cfg.id + '-kpi-bultos').textContent = sum(rows, 'Cantidad de Bultos').toLocaleString();
+  document.getElementById(cfg.id + '-kpi-paletas').textContent = sum(rows, 'Cantidad de Paletas').toLocaleString();
+
+  renderDashboardTable(rows, cfg.id + '-table-wrap');
+  document.getElementById(cfg.id + '-count').textContent = `Mostrando ${rows.length} de ${total} registros`;
+}
+
+function renderAllTipoViews() {
+  TIPOS_CONFIG.forEach(cfg => renderTipoView(cfg));
+}
+
 // ---------- Init ----------
 (async function init() {
   if (CONFIG.API_URL.includes('PEGA_AQUI')) {
@@ -951,6 +1103,7 @@ document.getElementById('btn-exportar').addEventListener('click', () => {
     return;
   }
   await loadMeta();
+  initTipoSections();
   await loadDashboard();
 })();
 </script>
