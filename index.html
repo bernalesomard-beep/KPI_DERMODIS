@@ -32,11 +32,11 @@
           "table-header": ["Inter"], "body-sm": ["Inter"], "body-md": ["Inter"]
         },
         fontSize: {
-          "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
-          "data-mono": ["13px", { lineHeight: "16px", fontWeight: "500" }],
-          "table-header": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
-          "body-sm": ["14px", { lineHeight: "20px", fontWeight: "400" }],
-          "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }]
+          "headline-md": ["20px", { lineHeight: "26px", fontWeight: "600" }],
+          "data-mono": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+          "table-header": ["11px", { lineHeight: "14px", letterSpacing: "0.05em", fontWeight: "600" }],
+          "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+          "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }]
         }
       }
     }
@@ -53,6 +53,26 @@
   .field-group.hidden-group { display: none; }
   .modal-overlay { display: none; }
   .modal-overlay.active { display: flex; }
+
+  /* ---- Animación ligera del sidebar (CSS puro, sin JS ni video) ---- */
+  .sidebar-anim { position: relative; width: 100%; height: 96px; overflow: hidden; }
+  .sidebar-anim .sky { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(123,212,199,0.12), rgba(123,212,199,0.02)); border-radius: 12px; }
+  .sidebar-anim .road { position: absolute; left: 0; right: 0; bottom: 18px; height: 3px; background: repeating-linear-gradient(90deg, theme('colors.outline-variant') 0 10px, transparent 10px 20px); }
+  .sidebar-anim .truck { position: absolute; bottom: 20px; left: -60px; animation: truck-drive 7s linear infinite; }
+  .sidebar-anim .truck svg { width: 56px; height: 34px; display: block; }
+  .sidebar-anim .cloud { position: absolute; top: 10px; opacity: 0.6; animation: cloud-drift 12s linear infinite; }
+  .sidebar-anim .cloud.c2 { top: 26px; animation-duration: 18s; animation-delay: -6s; opacity: 0.4; }
+  @keyframes truck-drive {
+    0%   { left: -60px; }
+    100% { left: 100%; }
+  }
+  @keyframes cloud-drift {
+    0%   { transform: translateX(-20px); }
+    100% { transform: translateX(340px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-anim .truck, .sidebar-anim .cloud { animation: none; left: 20px; }
+  }
 </style>
 </head>
 <body class="bg-background font-body-md text-on-surface flex h-screen overflow-hidden">
@@ -93,6 +113,25 @@
       <span class="material-symbols-outlined">history</span><span>Historial y Filtros</span>
     </a>
   </nav>
+  <div class="px-4 pb-2">
+    <div class="sidebar-anim">
+      <div class="sky"></div>
+      <svg class="cloud c1" width="30" height="14" viewBox="0 0 30 14"><ellipse cx="15" cy="8" rx="14" ry="6" fill="#bcdff5"/></svg>
+      <svg class="cloud c2" width="22" height="10" viewBox="0 0 22 10"><ellipse cx="11" cy="5" rx="10" ry="4" fill="#bcdff5"/></svg>
+      <div class="road"></div>
+      <div class="truck">
+        <svg viewBox="0 0 64 40" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="14" width="34" height="16" rx="2" fill="#1B717B"/>
+          <rect x="36" y="8" width="20" height="22" rx="2" fill="#7BD4C7"/>
+          <rect x="41" y="12" width="10" height="8" rx="1" fill="#F1FAFB"/>
+          <circle cx="14" cy="32" r="5" fill="#37474F"/>
+          <circle cx="14" cy="32" r="2" fill="#CFD8DC"/>
+          <circle cx="47" cy="32" r="5" fill="#37474F"/>
+          <circle cx="47" cy="32" r="2" fill="#CFD8DC"/>
+        </svg>
+      </div>
+    </div>
+  </div>
   <div class="p-6 border-t border-outline-variant">
     <span class="text-body-sm text-outline">Omar v2.0 · Conectado a Sheets</span>
   </div>
@@ -1078,6 +1117,7 @@ document.getElementById('btn-actualizar').addEventListener('click', async () => 
 });
 
 function formatK(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return n.toLocaleString();
 }
@@ -1146,9 +1186,10 @@ function applyDashboardFilters() {
   if (documento) rows = rows.filter(r => String(r['Documento de Ingreso'] || '').toUpperCase().includes(documento));
   if (guia) rows = rows.filter(r => String(r['Numero guia'] || '').toUpperCase().includes(guia));
 
-  // Se muestran TODAS las filas que coinciden, con lo último filtrado/registrado primero.
-  // El scroll del contenedor permite bajar y ver el resto hasta el origen.
-  const displayRows = rows.slice().reverse();
+  const hasFilter = !!(desde || hasta || mes || documento || guia);
+  // Sin filtro: solo las últimas 15 (carga rápida). Con cualquier filtro: se muestra TODO
+  // lo que coincide, con lo último primero, y scroll para ver el resto.
+  const displayRows = hasFilter ? rows.slice().reverse() : rows.slice(-15).reverse();
   dashboardFiltered = displayRows;
 
   renderDashboardTable(displayRows);
