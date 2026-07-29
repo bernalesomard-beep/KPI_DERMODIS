@@ -111,6 +111,10 @@
         <span id="current-period-label" class="text-body-sm font-semibold"></span>
         <span class="material-symbols-outlined text-outline">calendar_today</span>
       </div>
+      <div class="h-8 w-[1px] bg-outline-variant mx-1 hidden lg:block"></div>
+      <button id="btn-actualizar" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+        <span id="btn-actualizar-icon" class="material-symbols-outlined text-body-sm">refresh</span> Actualizar
+      </button>
     </div>
   </header>
 
@@ -172,6 +176,9 @@
             <button id="btn-exportar-dash" class="px-4 py-2 bg-primary text-on-primary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
               <span class="material-symbols-outlined text-body-sm">download</span> Exportar
             </button>
+            <button id="btn-kpi-signia" class="px-4 py-2 bg-secondary text-on-secondary rounded-lg text-body-sm font-semibold hover:opacity-90 flex items-center gap-2">
+              <span class="material-symbols-outlined text-body-sm">summarize</span> KPI SIGNIA
+            </button>
           </div>
         </div>
         <div class="px-6 py-4 bg-surface-container-lowest border-b border-outline-variant flex flex-wrap items-end gap-4">
@@ -187,12 +194,20 @@
             <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Mes</label>
             <select id="d-mes" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm min-w-[140px]"><option value="">Todos los meses</option></select>
           </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Documento</label>
+            <input id="d-documento" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm" placeholder="N° documento">
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[10px] font-bold text-primary uppercase tracking-wider">Guía</label>
+            <input id="d-guia" class="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-body-sm" placeholder="N° guía">
+          </div>
           <button id="btn-limpiar-dash" class="px-4 py-1.5 bg-surface border border-outline-variant text-on-surface-variant rounded-lg text-body-sm font-bold hover:bg-surface-container-high transition-colors flex items-center gap-1">
             <span class="material-symbols-outlined text-body-sm">filter_alt_off</span> Limpiar Filtros
           </button>
           <span id="bulk-msg" class="text-body-sm ml-auto"></span>
         </div>
-        <div class="overflow-x-auto max-h-[500px]" id="dashboard-table-wrap">Cargando datos…</div>
+        <div class="overflow-auto max-h-[600px]" id="dashboard-table-wrap">Cargando datos…</div>
         <div class="p-4 bg-surface-container-lowest border-t border-outline-variant flex items-center justify-between">
           <span id="dashboard-count" class="text-body-sm text-on-surface-variant">Mostrando 0 de 0 registros</span>
         </div>
@@ -419,6 +434,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
       historial: 'Historial y Filtros'
     };
     document.getElementById('page-title').textContent = titles[view] || 'Dashboard';
+    if (view.startsWith('tipo') && typeof ensureTipoViewRendered === 'function') ensureTipoViewRendered(view);
   });
 });
 
@@ -1035,13 +1051,31 @@ async function loadDashboard() {
     document.getElementById('eficiencia-bar').style.width = eficiencia + '%';
 
     applyDashboardFilters();
-    renderAllTipoViews();
+    markTipoViewsDirty();
+    const activeView = document.querySelector('.nav-link.active')?.dataset.view;
+    if (activeView && activeView.startsWith('tipo')) ensureTipoViewRendered(activeView);
   } catch (err) {
     setStatus(false, 'Error de conexión');
     document.getElementById('dashboard-table-wrap').innerHTML =
       `<p class="p-6 text-body-sm text-error">No se pudo conectar al backend. Verifica CONFIG.API_URL en el código.<br>${err.message}</p>`;
   }
 }
+
+// ---------- Botón Actualizar (recarga los datos desde el backend) ----------
+document.getElementById('btn-actualizar').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-actualizar');
+  const icon = document.getElementById('btn-actualizar-icon');
+  btn.disabled = true;
+  btn.classList.add('opacity-60', 'cursor-not-allowed');
+  icon.classList.add('animate-spin');
+  try {
+    await loadDashboard();
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+    icon.classList.remove('animate-spin');
+  }
+});
 
 function formatK(n) {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
@@ -1076,25 +1110,45 @@ function fechaToISO(v) {
   return '';
 }
 
+// ---------- Utilidad: debounce (evita recalcular en cada tecla, mejora rendimiento) ----------
+function debounce(fn, wait) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
 // ---------- Filtros del Dashboard (se aplican automáticamente al cambiar) ----------
 ['d-desde', 'd-hasta', 'd-mes'].forEach(id => {
   document.getElementById(id).addEventListener('change', applyDashboardFilters);
+});
+const applyDashboardFiltersDebounced = debounce(applyDashboardFilters, 250);
+['d-documento', 'd-guia'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyDashboardFiltersDebounced);
 });
 document.getElementById('btn-limpiar-dash').addEventListener('click', () => {
   document.getElementById('d-desde').value = '';
   document.getElementById('d-hasta').value = '';
   document.getElementById('d-mes').value = '';
+  document.getElementById('d-documento').value = '';
+  document.getElementById('d-guia').value = '';
   applyDashboardFilters();
 });
 function applyDashboardFilters() {
   const desde = val('d-desde'), hasta = val('d-hasta'), mes = val('d-mes');
+  const documento = val('d-documento').trim().toUpperCase();
+  const guia = val('d-guia').trim().toUpperCase();
   let rows = dashboardData.slice();
   if (mes) rows = rows.filter(r => String(r['Mes'] || '').trim().toUpperCase() === mes.toUpperCase());
   if (desde) rows = rows.filter(r => { const f = fechaToISO(r['Fecha de Emision de la NI']); return f && f >= desde; });
   if (hasta) rows = rows.filter(r => { const f = fechaToISO(r['Fecha de Emision de la NI']); return f && f <= hasta; });
+  if (documento) rows = rows.filter(r => String(r['Documento de Ingreso'] || '').toUpperCase().includes(documento));
+  if (guia) rows = rows.filter(r => String(r['Numero guia'] || '').toUpperCase().includes(guia));
 
-  const hasFilter = !!(desde || hasta || mes);
-  const displayRows = hasFilter ? rows.slice().reverse() : rows.slice(-15).reverse();
+  // Se muestran TODAS las filas que coinciden, con lo último filtrado/registrado primero.
+  // El scroll del contenedor permite bajar y ver el resto hasta el origen.
+  const displayRows = rows.slice().reverse();
   dashboardFiltered = displayRows;
 
   renderDashboardTable(displayRows);
@@ -1106,7 +1160,7 @@ function applyDashboardFilters() {
 document.getElementById('btn-exportar-dash').addEventListener('click', () => {
   const rows = getExportRows('dashboard-table-wrap', dashboardFiltered);
   if (!rows.length) { alert('No hay datos para exportar.'); return; }
-  const filename = buildKpiFilename(val('d-desde'), val('d-hasta'), val('d-mes'));
+  const filename = buildKpiFilename(val('d-desde'), val('d-hasta'), val('d-mes')) + '.xls';
   exportXLS(rows, filename);
 });
 
@@ -1149,9 +1203,75 @@ function exportXLS(rows, filename) {
   XLSX.writeFile(wb, filename, { bookType: 'xls' });
 }
 
+// ======================================================================
+// EXPORTAR EN FORMATO "KPI SIGNIA" (mismas cabeceras que KPI_SIGNIA_DERMODIS.xlsx)
+// ======================================================================
+// Cabeceras exactas del archivo de referencia que compartió el cliente.
+const KPI_SIGNIA_HEADERS = [
+  'Año - Mes', 'Cliente', 'Documento de Ingreso', 'Número guía', 'Tipo de Recepción',
+  'Fecha de Recepción', 'Fecha de Emision de la NI', 'Lead Time', 'Cumplimiento de Ingreso (NI)',
+  'Indicador Ácido', 'Estatus de Cumplimiento', 'Responsable', 'Motivo', 'Cantidad por Bulto',
+  'Cantidad de Recepciones', 'Cantidad Recepcionada', 'Analisis de Causa', 'Acciones Correctivas',
+  'Fecha de Ejecución', 'Responsable de Ejecución', 'EO'
+];
+
+// Mapea un registro del Sheet (con las cabeceras internas del dashboard) a una fila
+// con las cabeceras del formato KPI SIGNIA.
+// - 'Cliente' se fija en "DERMODIS SAC" y 'EO' en "OB" (pedido explícito del usuario).
+// - 'Analisis de Causa', 'Acciones Correctivas', 'Fecha de Ejecución' y 'Responsable de Ejecución'
+//   no existen como campo en el dashboard (son de llenado manual en el archivo de referencia,
+//   donde también aparecen vacíos/"-" en todas las filas de ejemplo), así que se dejan en "-".
+function mapRowToKpiSignia(r) {
+  const fechaRecepDisplay = formatFechaDisplay(r['Fecha de recepcion']);
+  const fechaNiISO = fechaToISO(r['Fecha de Emision de la NI']);
+  const fechaNiDisplay = formatFechaDisplay(r['Fecha de Emision de la NI']);
+  const anioMes = fechaNiISO ? fechaNiISO.slice(0, 7) : '';
+  return [
+    anioMes,
+    'DERMODIS SAC',
+    r['Documento de Ingreso'] ?? '',
+    r['Numero guia'] ?? '',
+    r['Tipo de Recepcion'] ?? '',
+    fechaRecepDisplay || '',
+    fechaNiDisplay || '',
+    r['Lead Time'] ?? '',
+    r['Cumplimiento de Ingreso (NI)'] ?? '',
+    r['Indicador Acido'] ?? '',
+    r['Status de cumplimiento'] ?? '',
+    r['Responsable'] ?? '',
+    r['Motivo de incumplimiento'] || '-',
+    r['Cantidad de Bultos'] ?? '',
+    r['Cantidad de Recepciones'] ?? '',
+    r['Suma de Unidades'] ?? '',
+    '-',
+    '-',
+    '-',
+    '-',
+    'OB'
+  ];
+}
+
+function exportKpiSignia(rows, filename) {
+  const aoa = [KPI_SIGNIA_HEADERS, ...rows.map(mapRowToKpiSignia)];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = KPI_SIGNIA_HEADERS.map(() => ({ wch: 20 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+  XLSX.writeFile(wb, filename);
+}
+
+document.getElementById('btn-kpi-signia').addEventListener('click', () => {
+  const rows = getExportRows('dashboard-table-wrap', dashboardFiltered);
+  if (!rows.length) { alert('No hay datos para exportar.'); return; }
+  const filename = buildKpiFilename(val('d-desde'), val('d-hasta'), val('d-mes'), 'KPI_SIGNIA_DERMODIS') + '.xlsx';
+  exportKpiSignia(rows, filename);
+});
+
+
 // Construye el nombre de archivo "KPI_..." según el rango de fechas o el mes filtrado.
 // Si no hay ningún filtro activo, usa la fecha de hoy.
-function buildKpiFilename(desde, hasta, mes) {
+function buildKpiFilename(desde, hasta, mes, prefix) {
+  prefix = prefix || 'KPI';
   let sufijo;
   if (desde || hasta) {
     sufijo = `${desde || 'inicio'}_a_${hasta || 'hoy'}`;
@@ -1160,7 +1280,7 @@ function buildKpiFilename(desde, hasta, mes) {
   } else {
     sufijo = new Date().toISOString().slice(0, 10);
   }
-  return `KPI_${sufijo}.xls`;
+  return `${prefix}_${sufijo}`;
 }
 
 // ---------- Historial con filtros ----------
@@ -1186,7 +1306,7 @@ async function loadHistorial() {
 document.getElementById('btn-exportar').addEventListener('click', () => {
   const rows = getExportRows('historial-table-wrap', currentData);
   if (!rows.length) { alert('No hay datos para exportar. Aplica un filtro primero.'); return; }
-  const filename = buildKpiFilename(val('h-desde'), val('h-hasta'), val('h-mes'));
+  const filename = buildKpiFilename(val('h-desde'), val('h-hasta'), val('h-mes')) + '.xls';
   exportXLS(rows, filename);
 });
 
@@ -1292,7 +1412,7 @@ function initTipoSections() {
     document.getElementById(cfg.id + '-btn-exportar').addEventListener('click', () => {
       const rows = getExportRows(cfg.id + '-table-wrap', getTipoFiltered(cfg));
       if (!rows.length) { alert('No hay datos para exportar.'); return; }
-      const filename = buildKpiFilename(val(cfg.id + '-desde'), val(cfg.id + '-hasta'), '');
+      const filename = buildKpiFilename(val(cfg.id + '-desde'), val(cfg.id + '-hasta'), '') + '.xls';
       exportXLS(rows, filename);
     });
   });
@@ -1317,6 +1437,24 @@ function renderTipoView(cfg) {
 
   renderDashboardTable(rows, cfg.id + '-table-wrap');
   document.getElementById(cfg.id + '-count').textContent = `Mostrando ${rows.length} de ${total} registros`;
+}
+
+// ---------- Render diferido de las vistas por Tipo ----------
+// En vez de renderizar las 4 secciones (Importación, Compra Local, Ofertas, Devoluciones)
+// cada vez que se cargan/actualizan los datos, se marcan como "pendientes" y solo se
+// construyen quando el usuario realmente entra a esa pestaña. Esto evita trabajo innecesario
+// (armar 4 tablas completas) cuando el usuario se queda en el Dashboard.
+const tipoViewsDirty = {};
+function markTipoViewsDirty() {
+  TIPOS_CONFIG.forEach(cfg => { tipoViewsDirty[cfg.id] = true; });
+}
+function ensureTipoViewRendered(id) {
+  const cfg = TIPOS_CONFIG.find(c => c.id === id);
+  if (!cfg) return;
+  if (tipoViewsDirty[id]) {
+    renderTipoView(cfg);
+    tipoViewsDirty[id] = false;
+  }
 }
 
 function renderAllTipoViews() {
