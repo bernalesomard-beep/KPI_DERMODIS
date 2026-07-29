@@ -836,6 +836,27 @@ function statusBadge(status) {
   return `<span class="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-[11px] font-bold tracking-tight">${status || '-'}</span>`;
 }
 
+// ---------- Ordenamiento de columnas en la tabla de Detalle ----------
+const dashboardSortState = {}; // containerId -> { col, dir }
+const SORTABLE_COLS_DASH = {
+  'Mes': r => String(r['Mes'] || '').toUpperCase(),
+  'Documento': r => String(r['Documento de Ingreso'] || ''),
+  'Contenedor / Referencia': r => String(r['Numero de Contenedor'] || r['Numero de referencia'] || r['Numero guia'] || ''),
+  'Fecha Emisión NI': r => fechaToISO(r['Fecha de Emision de la NI']) || ''
+};
+
+function sortRowsForTable(rows, containerId) {
+  const state = dashboardSortState[containerId];
+  if (!state || !state.col || !SORTABLE_COLS_DASH[state.col]) return rows;
+  const getVal = SORTABLE_COLS_DASH[state.col];
+  return rows.slice().sort((a, b) => {
+    const va = getVal(a), vb = getVal(b);
+    if (va < vb) return state.dir === 'asc' ? -1 : 1;
+    if (va > vb) return state.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
 function renderDashboardTable(rows, containerId) {
   containerId = containerId || 'dashboard-table-wrap';
   const container = document.getElementById(containerId);
@@ -845,11 +866,20 @@ function renderDashboardTable(rows, containerId) {
     rowSelections[containerId] = new Set();
     return;
   }
+  const originalRows = rows;
+  rows = sortRowsForTable(rows, containerId);
+
   let html = '<table class="w-full text-left border-collapse"><thead class="bg-surface-container-high sticky top-0 z-10"><tr>';
   html += `<th class="p-table-cell-padding w-8"><input type="checkbox" class="table-select-all"></th>`;
   ['Mes','Negocio','Documento','Contenedor / Referencia','Guía','Lead Time','Fecha Emisión NI','Status','Acciones'].forEach((c) => {
     const align = (c === 'Lead Time' || c === 'Acciones') ? 'text-center' : '';
-    html += `<th class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant ${align}">${c}</th>`;
+    const sortable = !!SORTABLE_COLS_DASH[c];
+    let arrow = '';
+    const state = dashboardSortState[containerId];
+    if (sortable && state && state.col === c) arrow = state.dir === 'asc' ? ' ▲' : ' ▼';
+    const cursorClass = sortable ? 'cursor-pointer select-none hover:text-primary' : '';
+    const dataAttr = sortable ? ` data-sort-col="${c}"` : '';
+    html += `<th${dataAttr} class="p-table-cell-padding text-table-header text-on-surface-variant uppercase border-b border-outline-variant ${align} ${cursorClass}">${c}${arrow}</th>`;
   });
   html += '</tr></thead><tbody class="divide-y divide-outline-variant">';
   rows.forEach((r, i) => {
@@ -869,6 +899,21 @@ function renderDashboardTable(rows, containerId) {
   });
   html += '</tbody></table>';
   container.innerHTML = html;
+
+  container.querySelectorAll('[data-sort-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sortCol;
+      const state = dashboardSortState[containerId] || { col: null, dir: 'asc' };
+      if (state.col === col) {
+        state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.col = col;
+        state.dir = 'asc';
+      }
+      dashboardSortState[containerId] = state;
+      renderDashboardTable(originalRows, containerId);
+    });
+  });
 
   container.querySelectorAll('.btn-editar-generic').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -905,23 +950,26 @@ function renderResumenMensual(containerId, data, meses, opts) {
     const u = sum(rows, opts.unidadKey);
     const b = sum(rows, 'Cantidad de Bultos');
     const p = sum(rows, 'Cantidad de Paletas');
+    const g = rows.filter(r => String(r['Numero guia'] || '').trim() !== '').length; // conteo de guías, incluye repetidas
     const destacado = i === 0;
     const labelU = opts.labelUnidad;
     if (destacado) {
       html += `<div class="p-3 ${opts.bgDestacado} rounded-lg">
         <div class="flex justify-between items-center mb-2"><span class="text-body-sm font-bold ${opts.textDestacado}">${titleCase(mes)}</span></div>
-        <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="grid grid-cols-4 gap-2 text-center">
           <div class="flex flex-col"><span class="text-[10px] ${opts.mutedText} uppercase">${labelU}</span><span class="font-data-mono text-body-sm font-bold">${u.toLocaleString()}</span></div>
           <div class="flex flex-col border-x border-outline-variant"><span class="text-[10px] ${opts.mutedText} uppercase">Bultos</span><span class="font-data-mono text-body-sm font-bold">${b.toLocaleString()}</span></div>
-          <div class="flex flex-col"><span class="text-[10px] ${opts.mutedText} uppercase">Paletas</span><span class="font-data-mono text-body-sm font-bold">${p.toLocaleString()}</span></div>
+          <div class="flex flex-col border-r border-outline-variant"><span class="text-[10px] ${opts.mutedText} uppercase">Paletas</span><span class="font-data-mono text-body-sm font-bold">${p.toLocaleString()}</span></div>
+          <div class="flex flex-col"><span class="text-[10px] ${opts.mutedText} uppercase">Guías</span><span class="font-data-mono text-body-sm font-bold">${g.toLocaleString()}</span></div>
         </div></div>`;
     } else {
       html += `<div class="p-3">
         <div class="flex justify-between items-center mb-2"><span class="text-body-sm font-medium">${titleCase(mes)}</span></div>
-        <div class="grid grid-cols-3 gap-2 text-center opacity-70">
+        <div class="grid grid-cols-4 gap-2 text-center opacity-70">
           <div class="flex flex-col"><span class="text-[10px] text-outline uppercase">${labelU}</span><span class="font-data-mono text-body-sm">${u.toLocaleString()}</span></div>
           <div class="flex flex-col border-x border-outline-variant"><span class="text-[10px] text-outline uppercase">Bultos</span><span class="font-data-mono text-body-sm">${b.toLocaleString()}</span></div>
-          <div class="flex flex-col"><span class="text-[10px] text-outline uppercase">Paletas</span><span class="font-data-mono text-body-sm">${p.toLocaleString()}</span></div>
+          <div class="flex flex-col border-r border-outline-variant"><span class="text-[10px] text-outline uppercase">Paletas</span><span class="font-data-mono text-body-sm">${p.toLocaleString()}</span></div>
+          <div class="flex flex-col"><span class="text-[10px] text-outline uppercase">Guías</span><span class="font-data-mono text-body-sm">${g.toLocaleString()}</span></div>
         </div></div>`;
     }
   });
@@ -1062,10 +1110,38 @@ document.getElementById('btn-exportar-dash').addEventListener('click', () => {
   exportXLS(rows, filename);
 });
 
+// ---------- Normaliza cualquier valor de hora a 'HH:MM' ----------
+// Soporta: 'HH:MM', 'HH:MM:SS', objetos Date, y fracciones de día (formato hora de Excel/Sheets).
+function horaToHHMM(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) {
+    return String(v.getHours()).padStart(2, '0') + ':' + String(v.getMinutes()).padStart(2, '0');
+  }
+  if (typeof v === 'number' && !isNaN(v)) {
+    const fraccionDia = v % 1;
+    const totalMin = Math.round(fraccionDia * 24 * 60);
+    const h = Math.floor(totalMin / 60) % 24;
+    const m = totalMin % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  }
+  const s = String(v).trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) return String(Number(m[1])).padStart(2, '0') + ':' + m[2];
+  return s;
+}
+
 // ---------- Exportar a XLS (usa SheetJS, ya cargado en la página) ----------
 function exportXLS(rows, filename) {
   const cols = HEADERS_ORDER;
-  const aoa = [cols, ...rows.map(r => cols.map(c => r[c] ?? ''))];
+  const colsFecha = new Set(['Fecha de recepcion', 'Fecha de Emision de la NI']);
+  const colsHora = new Set(['HORA INICIO', 'HORA FINAL', 'LEAD TIME ATENCION']);
+  const aoa = [cols, ...rows.map(r => cols.map(c => {
+    const v = r[c] ?? '';
+    if (colsFecha.has(c)) return formatFechaDisplay(v);
+    if (colsHora.has(c)) return horaToHHMM(v);
+    return v;
+  }))];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = cols.map(() => ({ wch: 20 }));
   const wb = XLSX.utils.book_new();
